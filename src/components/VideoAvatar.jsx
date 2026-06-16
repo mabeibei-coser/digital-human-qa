@@ -1,57 +1,106 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-// 数字人三段视频状态，资产放在 public/avatar/（见该目录 README）
-const CLIPS = {
-  idle: { src: 'avatar/idle.webm', loop: true, label: '待命中' },
-  intro: { src: 'avatar/intro.webm', loop: false, label: '欢迎介绍' },
-  speaking: { src: 'avatar/speaking.webm', loop: true, label: '正在回答' },
-}
+// 三态透明视频数字人：idle/speaking 静音循环常驻（crossfade，零黑帧）；
+// intro 带欢迎语音、只在 intro 态播一次，离开 intro 态立即暂停（停欢迎语音，防与回答 TTS 重叠）。
+const inlineAttrs = { 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }
+const V = '6' // 视频缓存版本号：换视频后 +1
 
-export default function VideoAvatar({ state = 'idle', onIntroEnd }) {
-  const clip = CLIPS[state] ?? CLIPS.idle
-  const videoRef = useRef(null)
-  const [failed, setFailed] = useState(false)
+const CLIPS = [
+  { key: 'idle', file: 'idle.webm', loop: true },
+  { key: 'intro', file: 'intro.webm', loop: false },
+  { key: 'speaking', file: 'speaking.webm', loop: true },
+]
 
-  // 切换状态时重置加载失败标记，并从头播放
-  useEffect(() => {
-    setFailed(false)
-    const v = videoRef.current
-    if (v) {
-      v.currentTime = 0
-      v.play().catch(() => {})
+export default function VideoAvatar({ state = 'intro', onIntroEnd }) {
+  const idleRef = useRef(null)
+  const introRef = useRef(null)
+  const speakingRef = useRef(null)
+  const refs = { idle: idleRef, intro: introRef, speaking: speakingRef }
+  const [failed, setFailed] = useState({})
+  const armedRef = useRef(false)
+  const base = import.meta.env.BASE_URL + 'avatar/'
+
+  // 首次交互解锁：若欢迎仍在播且被静音，则解除静音让欢迎语音接着出声。
+  // 只解除静音，不重播、不改状态——避免和「提问→回答 TTS」撞车出现重复欢迎语。
+  const armUnlockOnce = useCallback(() => {
+    if (armedRef.current) return
+    armedRef.current = true
+    const events = ['pointerdown', 'keydown', 'touchend', 'click']
+    const unlock = () => {
+      const intro = introRef.current
+      if (intro && intro.muted && !intro.ended && !intro.paused) {
+        intro.muted = false
+        intro.play().catch(() => {})
+      }
+      events.forEach((e) => window.removeEventListener(e, unlock))
     }
+    events.forEach((e) => window.addEventListener(e, unlock))
+  }, [])
+
+  // idle / speaking：静音循环常驻
+  useEffect(() => {
+    ;[idleRef.current, speakingRef.current].forEach((v) => {
+      if (v) {
+        v.muted = true
+        v.play().catch(() => {})
+      }
+    })
+  }, [])
+
+  // 状态切换：intro 态从头播欢迎（带声，被拦则静音+等首次交互解锁）；
+  // 非 intro 态则暂停 intro（停欢迎语音），并从头播当前态视频。
+  useEffect(() => {
+    const intro = introRef.current
+    if (state === 'intro') {
+      if (intro) {
+        try { intro.currentTime = 0 } catch (e) { /* ignore */ }
+        intro.muted = false
+        intro.play().catch(() => {
+          intro.muted = true
+          intro.play().catch(() => {})
+          armUnlockOnce()
+        })
+      }
+    } else {
+      if (intro) intro.pause()
+      const active = refs[state]?.current
+      if (active) {
+        try { active.currentTime = 0 } catch (e) { /* ignore */ }
+        active.play().catch(() => {})
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 
-  // 用 BASE_URL 拼路径，子路径部署（/a900/）下视频才不会 404
-  const src = import.meta.env.BASE_URL + clip.src
+  const allFailed = CLIPS.every((c) => failed[c.key])
 
   return (
-    <div className="avatar-stage">
-      {!failed ? (
+    <div className="avatar">
+      {CLIPS.map((c) => (
         <video
-          ref={videoRef}
-          className="avatar-video"
-          src={src}
+          key={c.key}
+          ref={refs[c.key]}
+          className={'avatar__clip' + (state === c.key ? ' is-shown' : '')}
+          src={base + c.file + '?v=' + V}
+          muted={c.key !== 'intro'}
           autoPlay
-          muted
           playsInline
-          loop={clip.loop}
-          onError={() => setFailed(true)}
+          loop={c.loop}
+          preload="auto"
+          aria-hidden="true"
+          onError={() => setFailed((f) => ({ ...f, [c.key]: true }))}
           onEnded={() => {
-            if (!clip.loop) onIntroEnd?.()
+            if (c.key === 'intro') onIntroEnd?.()
           }}
+          {...inlineAttrs}
         />
-      ) : (
-        <div className="avatar-placeholder">
-          <div className="avatar-placeholder__figure">🧑‍💼</div>
-          <p className="avatar-placeholder__hint">
-            数字人视频待接入
-            <br />
-            <span>把 {clip.src.split('/').pop()} 放进 public/avatar/</span>
-          </p>
+      ))}
+      {allFailed && (
+        <div className="avatar__placeholder">
+          <div className="avatar__ph-figure">🧑‍💼</div>
+          <p>数字人加载中…</p>
         </div>
       )}
-      <span className="avatar-state-badge">{clip.label}</span>
     </div>
   )
 }

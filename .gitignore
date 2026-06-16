@@ -7,3 +7,6 @@ dist/
 .DS_Store
 *.log
 .vite/
+public/avatar/*.mp4
+tmp/
+ig_*.png
