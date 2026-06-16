@@ -98,8 +98,8 @@ export default function ChatPanel({ onSpeakingChange }) {
   async function runWorker() {
     if (workerRef.current) return
     workerRef.current = true
-    onSpeakingChange?.(true)
     let nextSynth = null
+    let started = false // 等首段语音「真正开始播放」时才切说话态（而非文字出现时）
     while (true) {
       let b64 = null
       if (nextSynth) {
@@ -114,10 +114,16 @@ export default function ChatPanel({ onSpeakingChange }) {
         break // 队列空 + 流结束
       }
       if (queueRef.current.length) nextSynth = synthOne(queueRef.current.shift())
-      if (b64) await playOne(b64)
+      if (b64) {
+        if (!started) {
+          started = true
+          onSpeakingChange?.(true) // 语音开始播放的同时，数字人切「说话」
+        }
+        await playOne(b64)
+      }
     }
     workerRef.current = false
-    onSpeakingChange?.(false)
+    if (started) onSpeakingChange?.(false)
   }
 
   function enqueue(sentence) {
