@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 // 全部「静音自动播」打底——iOS/微信只允许静音视频自动播，这样各端都一定能显示画面。
 // 欢迎语音：加载后尝试解除静音（桌面/启动器允许时成功）+ 首次触摸解锁（iOS）。
 const inlineAttrs = { 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }
-const V = '8' // 视频缓存版本号
+const V = '9' // 视频缓存版本号
 
 // iOS / 微信不支持透明 WebM 的 alpha → 用烤了页面背景的不透明 mp4；桌面/安卓 Chrome 用透明 webm。
 const UA = typeof navigator !== 'undefined' ? navigator.userAgent || '' : ''
@@ -36,11 +36,12 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd }) {
     armedRef.current = true
     const events = ['pointerdown', 'keydown', 'touchend', 'click']
     const unlock = () => {
-      const v = introRef.current
-      if (v && v.muted && !v.ended && !v.paused) {
-        v.muted = false
-        setIntroMuted(false)
-        v.play().catch(() => {})
+      // 播放所有视频（覆盖 iOS 省电模式对自动播放的拦截）
+      ;[idleRef.current, speakingRef.current].forEach((v) => { if (v) v.play().catch(() => {}) })
+      const intro = introRef.current
+      if (intro) {
+        if (intro.muted && !intro.ended) { intro.muted = false; setIntroMuted(false) }
+        intro.play().catch(() => {})
       }
       events.forEach((e) => window.removeEventListener(e, unlock))
     }
@@ -60,7 +61,7 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd }) {
     })
     if (intro) {
       intro.muted = true
-      intro.play().catch(() => {}) // 先静音播起来（显示）
+      intro.play().catch(() => {}) // 先静音播起来（能放就放）
       if (!NO_ALPHA) {
         // 桌面：尝试有声自动播（启动器 --autoplay-policy / 高 MEI 时成功）
         intro.muted = false
@@ -71,13 +72,10 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd }) {
             intro.muted = true
             setIntroMuted(true)
             intro.play().catch(() => {})
-            armUnlock()
           })
-      } else {
-        // iOS/微信：只能静音自动播显示，欢迎语音等首次手势
-        armUnlock()
       }
     }
+    armUnlock() // 始终挂首次触摸兜底：覆盖 iOS 省电模式（禁自动播）+ 给欢迎语音
   }, [armUnlock])
 
   // 状态切换：非 intro 态暂停 intro（停欢迎语音）并从头播当前态视频；intro 的播放由挂载 effect 管
@@ -106,6 +104,7 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd }) {
           ref={refs[c.key]}
           className={'avatar__clip' + (state === c.key ? ' is-shown' : '')}
           src={base + c.file + EXT + '?v=' + V}
+          poster={base + 'poster.jpg?v=' + V}
           muted={c.key === 'intro' ? introMuted : true}
           autoPlay
           playsInline
