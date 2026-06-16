@@ -1,17 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { NO_ALPHA } from '../noAlpha.js'
 
 // 三态视频数字人：idle/speaking 静音循环常驻（crossfade）；intro 进场播一次。
 // 全部「静音自动播」打底——iOS/微信只允许静音视频自动播，这样各端都一定能显示画面。
 // 欢迎语音：加载后尝试解除静音（桌面/启动器允许时成功）+ 首次触摸解锁（iOS）。
 const inlineAttrs = { 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }
-const V = '9' // 视频缓存版本号
+const V = '10' // 视频缓存版本号
 
-// iOS / 微信不支持透明 WebM 的 alpha → 用烤了页面背景的不透明 mp4；桌面/安卓 Chrome 用透明 webm。
-const UA = typeof navigator !== 'undefined' ? navigator.userAgent || '' : ''
-const NO_ALPHA =
-  /iP(hone|ad|od)/.test(UA) ||
-  /MicroMessenger/i.test(UA) ||
-  (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+// iOS/微信不支持透明 WebM → 用不透明 mp4（纯色底，与页面背景同色，无拼接缝）；桌面/安卓 Chrome 用透明 webm。
 const EXT = NO_ALPHA ? '.fallback.mp4' : '.webm'
 
 const CLIPS = [
