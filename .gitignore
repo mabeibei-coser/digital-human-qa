@@ -8,5 +8,6 @@ dist/
 *.log
 .vite/
 public/avatar/*.mp4
+!public/avatar/*.fallback.mp4
 tmp/
 ig_*.png

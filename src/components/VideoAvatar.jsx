@@ -3,12 +3,21 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 // 三态透明视频数字人：idle/speaking 静音循环常驻（crossfade，零黑帧）；
 // intro 带欢迎语音、只在 intro 态播一次，离开 intro 态立即暂停（停欢迎语音，防与回答 TTS 重叠）。
 const inlineAttrs = { 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }
-const V = '6' // 视频缓存版本号：换视频后 +1
+const V = '7' // 视频缓存版本号：换视频/换格式后 +1
+
+// iOS / 微信不支持透明 WebM 的 alpha（会把原始白底显示出来）→ 用烤了页面背景的不透明 mp4；
+// 桌面 Chrome / 安卓用透明 webm（页面背景从人物边缘透出，更精致）。
+const UA = typeof navigator !== 'undefined' ? navigator.userAgent || '' : ''
+const NO_ALPHA =
+  /iP(hone|ad|od)/.test(UA) ||
+  /MicroMessenger/i.test(UA) ||
+  (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+const EXT = NO_ALPHA ? '.fallback.mp4' : '.webm'
 
 const CLIPS = [
-  { key: 'idle', file: 'idle.webm', loop: true },
-  { key: 'intro', file: 'intro.webm', loop: false },
-  { key: 'speaking', file: 'speaking.webm', loop: true },
+  { key: 'idle', file: 'idle', loop: true },
+  { key: 'intro', file: 'intro', loop: false },
+  { key: 'speaking', file: 'speaking', loop: true },
 ]
 
 export default function VideoAvatar({ state = 'intro', onIntroEnd }) {
@@ -81,7 +90,7 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd }) {
           key={c.key}
           ref={refs[c.key]}
           className={'avatar__clip' + (state === c.key ? ' is-shown' : '')}
-          src={base + c.file + '?v=' + V}
+          src={base + c.file + EXT + '?v=' + V}
           muted={c.key !== 'intro'}
           autoPlay
           playsInline
