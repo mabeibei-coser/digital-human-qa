@@ -5,7 +5,7 @@ import Landing from './components/Landing.jsx'
 import { NO_ALPHA, PAGE_TEAL } from './noAlpha.js'
 
 export default function App() {
-  // 前序页 → 数字人页（同一文档内切换，不跳网址）：点「进入」是一次真实手势，
+  // 前序首页 → 数字人页（同一文档内切换，不跳网址）：点按钮是一次真实手势，
   // 解锁有声播放，切到数字人页后欢迎语能直接出声（见 VideoAvatar autoUnlock）。
   const [entered, setEntered] = useState(false)
 
@@ -13,23 +13,40 @@ export default function App() {
   // 回答时由 ChatPanel 的 TTS 播放驱动 speaking（播放期间嘴动，播完回 idle）。
   const [avatarState, setAvatarState] = useState('intro')
 
-  // 桌面：背景大图 + 透明数字人；iOS/微信：纯色青绿 + 不透明数字人（同色，无拼接缝）
+  // 桌面：背景大图 + 透明数字人；iOS/微信：纯色 + 不透明数字人（同色，无拼接缝）
   const bgUrl = `${import.meta.env.BASE_URL}bg.jpg`
   const mobileBgUrl = `${import.meta.env.BASE_URL}mobile-service-hall-bg.png`
   const pageStyle = NO_ALPHA
     ? { background: PAGE_TEAL, '--mobile-bg': `url(${mobileBgUrl})` }
     : { backgroundImage: `url(${bgUrl})`, '--mobile-bg': `url(${mobileBgUrl})` }
 
+  function goHome() {
+    setEntered(false)
+    setAvatarState('intro') // 回首页后再进，重新播一次欢迎
+  }
+
   return (
     <div className="page" style={pageStyle}>
       {!entered && (
-        <div className="desktop-landing">
-          <Landing onEnter={() => setEntered(true)} />
+        <div className="home-landing">
+          <Landing
+            onEnter={() => setEntered(true)}
+            onSim={() => alert('3D 数字仿真人演示即将上线，敬请期待')}
+          />
         </div>
       )}
 
-      <div className={'layout' + (entered ? '' : ' is-mobile-direct')}>
+      <div className={'layout' + (entered ? '' : ' is-hidden')}>
         <section className="avatar-col">
+          {entered && (
+            <button type="button" className="back-home" onClick={goHome} aria-label="返回首页">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+              返回
+            </button>
+          )}
           <div className="mobile-hero-copy">
             <h1>
               <span>创业服务</span>

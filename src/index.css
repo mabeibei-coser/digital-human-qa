@@ -35,11 +35,11 @@ body {
   background-repeat: no-repeat;
 }
 
-.desktop-landing {
+.home-landing {
   height: 100%;
 }
 
-.layout.is-mobile-direct {
+.layout.is-hidden {
   display: none;
 }
 
@@ -71,6 +71,7 @@ body {
 
 /* 左：数字人 */
 .avatar-col {
+  position: relative;
   flex: 0 1 40%;
   align-self: stretch;
   display: flex;
@@ -459,6 +460,56 @@ body {
   transform: translateY(0);
 }
 
+/* 两个演示入口：纵向排列，等宽居中 */
+.landing__btns {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+.landing__btns .landing__btn {
+  margin-top: 0;
+  width: 100%;
+  justify-content: center;
+}
+/* 第二个（数字仿真人）为占位入口，用次要描边样式区分 */
+.landing__btn--alt {
+  color: #0b8278;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1.5px solid rgba(12, 130, 118, 0.45);
+  box-shadow: 0 12px 28px -18px rgba(12, 130, 118, 0.5);
+}
+.landing__btn--alt:hover {
+  box-shadow: 0 16px 32px -18px rgba(12, 130, 118, 0.6);
+}
+
+/* 问答页返回首页按钮（hero 左上角） */
+.back-home {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: 14px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 13px 6px 9px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0b8278;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 6px 18px -10px rgba(13, 70, 60, 0.45);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.back-home:active {
+  transform: scale(0.96);
+}
+
 /* 响应式：只重做手机页，桌面布局保持原样 */
 @media (max-width: 920px) {
   .page {
@@ -467,12 +518,7 @@ body {
     background-image: none !important;
   }
 
-  .desktop-landing {
-    display: none;
-  }
-
-  .layout,
-  .layout.is-mobile-direct {
+  .layout {
     width: min(100%, 430px);
     height: 100dvh;
     max-width: none;

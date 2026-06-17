@@ -101,6 +101,7 @@ export default function ChatPanel({ onSpeakingChange }) {
   const recChunksRef = useRef([])
   const micStreamRef = useRef(null)
   const recTimerRef = useRef(null)
+  const audioPrimedRef = useRef(false) // 移动端音频是否已解锁
 
   useEffect(() => {
     const el = listRef.current
@@ -182,6 +183,7 @@ export default function ChatPanel({ onSpeakingChange }) {
 
   async function startRec() {
     if (recording || asrBusy || loading) return
+    primeAudio()
     onSpeakingChange?.(false) // 退出欢迎态、停欢迎语音
     let stream
     try {
@@ -238,7 +240,24 @@ export default function ChatPanel({ onSpeakingChange }) {
     }
   }
 
+  // 移动端音频解锁：TTS 的 play() 在 LLM 流式返回后才发生，已不在点击手势内、会被手机浏览器拦静音。
+  // 首次用户手势里先用一段静音「解锁」audio 元素，之后程序化 play() 才放得出声。
+  function primeAudio() {
+    if (audioPrimedRef.current) return
+    const a = audioRef.current
+    if (!a) return
+    audioPrimedRef.current = true
+    try {
+      a.src = `${BASE}silent.mp3`
+      const p = a.play()
+      if (p && p.then) p.then(() => { a.pause(); a.currentTime = 0 }).catch(() => {})
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
   async function send(text) {
+    primeAudio()
     const q = (text ?? input).trim()
     if (!q || loading) return
     onSpeakingChange?.(false) // 退出欢迎态、停欢迎语音
