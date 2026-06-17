@@ -91,10 +91,7 @@ export default function ChatPanel({ onSpeakingChange }) {
   const listRef = useRef(null)
   const audioRef = useRef(null)
 
-  // TTS 流水线：句子队列 + 顺序播放 + 边播边合成下一句
-  const queueRef = useRef([]) // 待合成的句子
-  const streamDoneRef = useRef(true) // LLM 流是否结束
-  const workerRef = useRef(false) // 播放/合成 worker 是否在跑
+  // TTS：答案文字全部生成完后，再一次性合成整段语音播放（数字人开口与语音严格同步）
 
   // 语音提问（录音 → ASR）
   const mrRef = useRef(null)
@@ -131,45 +128,6 @@ export default function ChatPanel({ onSpeakingChange }) {
       a.onerror = resolve
       a.play().catch(() => resolve())
     })
-  }
-
-  // worker：从句子队列取句 → 合成 → 播放；播当前句时预合成下一句，减少句间停顿
-  async function runWorker() {
-    if (workerRef.current) return
-    workerRef.current = true
-    let nextSynth = null
-    let started = false // 等首段语音「真正开始播放」时才切说话态（而非文字出现时）
-    while (true) {
-      let b64 = null
-      if (nextSynth) {
-        b64 = await nextSynth
-        nextSynth = null
-      } else if (queueRef.current.length) {
-        b64 = await synthOne(queueRef.current.shift())
-      } else if (!streamDoneRef.current) {
-        await new Promise((r) => setTimeout(r, 60)) // 等更多句子
-        continue
-      } else {
-        break // 队列空 + 流结束
-      }
-      if (queueRef.current.length) nextSynth = synthOne(queueRef.current.shift())
-      if (b64) {
-        if (!started) {
-          started = true
-          onSpeakingChange?.(true) // 语音开始播放的同时，数字人切「说话」
-        }
-        await playOne(b64)
-      }
-    }
-    workerRef.current = false
-    if (started) onSpeakingChange?.(false)
-  }
-
-  function enqueue(sentence) {
-    const t = sentence.trim()
-    if (!t) return
-    queueRef.current.push(t)
-    runWorker()
   }
 
   // ── 语音提问：点麦克风开始录音，再点结束 → 转写 → 自动当作提问发出 ──
@@ -266,35 +224,15 @@ export default function ChatPanel({ onSpeakingChange }) {
     setInput('')
     setLoading(true)
 
-    // 重置 TTS 流水线
-    queueRef.current = []
-    streamDoneRef.current = false
     let answer = ''
-    let pending = '' // 还没凑成整句的尾巴
+    let errored = false
     const updateLast = (txt) =>
       setMessages((m) => {
         const c = m.slice()
         c[c.length - 1] = { role: 'assistant', text: txt }
         return c
       })
-    function feed(delta) {
-      answer += delta
-      updateLast(answer)
-      pending += delta
-      // 优先按句末标点切句送 TTS；句子太长时（>=20字）也按逗号/顿号切一小段先念，让数字人更快开口
-      while (true) {
-        let m = pending.search(/[。！？!?\n]/)
-        if (m === -1 && pending.length >= 20) {
-          const c = pending.search(/[，、；,;]/)
-          if (c >= 6) m = c
-        }
-        if (m === -1) break
-        enqueue(pending.slice(0, m + 1))
-        pending = pending.slice(m + 1)
-      }
-    }
 
-    let errored = false
     try {
       const r = await fetch(`${BASE}api/chat`, {
         method: 'POST',
@@ -318,8 +256,10 @@ export default function ChatPanel({ onSpeakingChange }) {
           if (data === '[DONE]') continue
           try {
             const j = JSON.parse(data)
-            if (j.delta) feed(j.delta)
-            else if (j.error) {
+            if (j.delta) {
+              answer += j.delta
+              updateLast(answer) // 流式只更新文字，先不合成语音
+            } else if (j.error) {
               errored = true
               updateLast(j.error)
             }
@@ -328,14 +268,26 @@ export default function ChatPanel({ onSpeakingChange }) {
           }
         }
       }
-      if (pending.trim()) enqueue(pending) // 最后不足一句的尾巴也念出来
-      if (!answer && !errored) updateLast('抱歉，我这会儿有点忙，请稍后再问我一次。')
+      if (!answer && !errored) {
+        errored = true
+        updateLast('抱歉，我这会儿有点忙，请稍后再问我一次。')
+      }
     } catch (e) {
+      errored = true
       updateLast('抱歉，网络好像有点问题，请稍后再试。')
     } finally {
-      streamDoneRef.current = true
       setLoading(false)
-      runWorker() // 兜底：确保队列被处理干净
+    }
+
+    // 全部文字生成完之后，再一次性合成整段语音并播放；
+    // 数字人只在这段语音播放期间「开口」，播完立即回待命——开口起止与语音严格一致。
+    if (answer.trim() && !errored) {
+      const b64 = await synthOne(answer.trim())
+      if (b64) {
+        onSpeakingChange?.(true)
+        await playOne(b64)
+        onSpeakingChange?.(false)
+      }
     }
   }
 
