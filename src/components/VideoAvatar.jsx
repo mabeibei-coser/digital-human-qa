@@ -23,6 +23,10 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
   const refs = { idle: idleRef, intro: introRef, speaking: speakingRef }
   const [failed, setFailed] = useState({})
   const [introMuted, setIntroMuted] = useState(true) // intro 初始静音→各端都能自动播+显示
+  // 切换时把「上一个状态」的视频垫在底层并保持不透明，新视频在它之上淡入，
+  // 避免对称 crossfade 中途两个人物都半透明 → 人物变淡/露底色「白闪」。
+  const [prevState, setPrevState] = useState(null)
+  const prevStateRef = useRef(state)
   const armedRef = useRef(false)
   const base = import.meta.env.BASE_URL + 'avatar/'
 
@@ -91,6 +95,15 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 
+  // 记录上一个状态：过渡期间它垫底（不透明）托住人物，过渡结束（略长于 220ms 淡入）后撤掉
+  useEffect(() => {
+    if (prevStateRef.current === state) return
+    setPrevState(prevStateRef.current)
+    prevStateRef.current = state
+    const t = setTimeout(() => setPrevState(null), 300)
+    return () => clearTimeout(t)
+  }, [state])
+
   const allFailed = CLIPS.every((c) => failed[c.key])
 
   return (
@@ -99,7 +112,10 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
         <video
           key={c.key}
           ref={refs[c.key]}
-          className={'avatar__clip' + (state === c.key ? ' is-shown' : '')}
+          className={
+            'avatar__clip' +
+            (state === c.key ? ' is-shown' : prevState === c.key ? ' is-prev' : '')
+          }
           src={base + c.file + EXT + '?v=' + V}
           poster={base + 'poster.jpg?v=' + V}
           muted={c.key === 'intro' ? introMuted : true}

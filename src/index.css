@@ -81,12 +81,19 @@ body {
   object-position: bottom center;
   pointer-events: none;
   opacity: 0;
+  z-index: 1;
   transition: opacity 220ms ease-out;
   will-change: opacity;
 }
-.avatar__clip.is-shown {
+/* 上一个状态：过渡期间垫在底层并保持完全不透明，托住人物不变淡；
+   新视频（is-shown）在它之上从 0 淡入到 1，人物全程「实」着，无 crossfade 半透明白闪 */
+.avatar__clip.is-prev {
   opacity: 1;
   z-index: 2;
+}
+.avatar__clip.is-shown {
+  opacity: 1;
+  z-index: 3;
 }
 .avatar-platform {
   position: absolute;
