@@ -16,7 +16,7 @@ const CLIPS = [
   { key: 'speaking', file: 'speaking', loop: true },
 ]
 
-export default function VideoAvatar({ state = 'intro', onIntroEnd }) {
+export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = false }) {
   const idleRef = useRef(null)
   const introRef = useRef(null)
   const speakingRef = useRef(null)
@@ -58,8 +58,9 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd }) {
     if (intro) {
       intro.muted = true
       intro.play().catch(() => {}) // 先静音播起来（能放就放）
-      if (!NO_ALPHA) {
-        // 桌面：尝试有声自动播（启动器 --autoplay-policy / 高 MEI 时成功）
+      // 桌面历来允许有声自动播；autoUnlock=从前序页一次真实手势进来（含 iOS/微信），
+      // 借这次 user activation 直接有声播欢迎语，不用再点一次。失败仍由 armUnlock 兜底。
+      if (!NO_ALPHA || autoUnlock) {
         intro.muted = false
         intro
           .play()
@@ -72,7 +73,7 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd }) {
       }
     }
     armUnlock() // 始终挂首次触摸兜底：覆盖 iOS 省电模式（禁自动播）+ 给欢迎语音
-  }, [armUnlock])
+  }, [armUnlock, autoUnlock])
 
   // 状态切换：非 intro 态暂停 intro（停欢迎语音）并从头播当前态视频；intro 的播放由挂载 effect 管
   useEffect(() => {
