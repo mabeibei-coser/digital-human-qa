@@ -7,6 +7,7 @@ import {
   JapaneseYen,
   Landmark,
   MessageCircle,
+  MessageCircleMore,
   Mic,
   Send,
   ShieldCheck,
@@ -54,6 +55,8 @@ function Icon({ name }) {
       return <JapaneseYen {...common} />
     case 'doc':
       return <MessageCircle {...common} />
+    case 'chat-dots':
+      return <MessageCircleMore {...common} />
     case 'gift':
       return <Gift {...common} />
     case 'shield':
@@ -82,6 +85,8 @@ export default function ChatPanel({ onSpeakingChange }) {
   }])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [recording, setRecording] = useState(false) // 正在录音
+  const [asrBusy, setAsrBusy] = useState(false) // 正在识别
   const isMobile = isMobileViewport()
   const listRef = useRef(null)
   const audioRef = useRef(null)
@@ -90,6 +95,12 @@ export default function ChatPanel({ onSpeakingChange }) {
   const queueRef = useRef([]) // 待合成的句子
   const streamDoneRef = useRef(true) // LLM 流是否结束
   const workerRef = useRef(false) // 播放/合成 worker 是否在跑
+
+  // 语音提问（录音 → ASR）
+  const mrRef = useRef(null)
+  const recChunksRef = useRef([])
+  const micStreamRef = useRef(null)
+  const recTimerRef = useRef(null)
 
   useEffect(() => {
     const el = listRef.current
@@ -158,6 +169,73 @@ export default function ChatPanel({ onSpeakingChange }) {
     if (!t) return
     queueRef.current.push(t)
     runWorker()
+  }
+
+  // ── 语音提问：点麦克风开始录音，再点结束 → 转写 → 自动当作提问发出 ──
+  function pickRecMime() {
+    const cands = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm']
+    for (const m of cands) {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)) return m
+    }
+    return ''
+  }
+
+  async function startRec() {
+    if (recording || asrBusy || loading) return
+    onSpeakingChange?.(false) // 退出欢迎态、停欢迎语音
+    let stream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch (e) {
+      setMessages((m) => [
+        ...m,
+        { role: 'assistant', text: '我暂时听不到声音，请允许浏览器使用麦克风，或直接打字提问我。' },
+      ])
+      return
+    }
+    micStreamRef.current = stream
+    const mime = pickRecMime()
+    const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
+    recChunksRef.current = []
+    mr.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) recChunksRef.current.push(e.data)
+    }
+    mr.onstop = () => transcribeRec(mr.mimeType || mime)
+    mrRef.current = mr
+    mr.start() // 不分片，stop 时一次性拿完整 Blob（避免部分手机分片丢 EBML 头）
+    setRecording(true)
+    recTimerRef.current = setTimeout(() => stopRec(), 30000) // 安全上限 30s 自动停
+  }
+
+  function stopRec() {
+    clearTimeout(recTimerRef.current)
+    const mr = mrRef.current
+    if (mr && mr.state !== 'inactive') mr.stop() // 触发 onstop → transcribeRec
+    setRecording(false)
+  }
+
+  async function transcribeRec(mime) {
+    const stream = micStreamRef.current
+    if (stream) stream.getTracks().forEach((t) => t.stop())
+    micStreamRef.current = null
+    const blob = new Blob(recChunksRef.current, { type: mime || 'audio/webm' })
+    recChunksRef.current = []
+    if (blob.size < 3000) return // 太短，当作没说话
+    setAsrBusy(true)
+    try {
+      const r = await fetch(`${BASE}api/asr`, {
+        method: 'POST',
+        headers: { 'Content-Type': blob.type || 'audio/webm' },
+        body: blob,
+      })
+      const d = await r.json()
+      const text = (d.text || '').trim()
+      if (text) send(text) // 识别成功 → 自动提问，数字人作答
+    } catch (e) {
+      /* 网络异常静默，用户可重试或打字 */
+    } finally {
+      setAsrBusy(false)
+    }
   }
 
   async function send(text) {
@@ -260,6 +338,7 @@ export default function ChatPanel({ onSpeakingChange }) {
         </span>
       </header>
 
+      <div className="chat__body">
       <div className="chat__messages" ref={listRef}>
         {messages.map((m, i) => (
           <div key={i} className={'msg msg--' + (m.role === 'assistant' ? 'bot' : 'user')}>
@@ -300,7 +379,7 @@ export default function ChatPanel({ onSpeakingChange }) {
       <div className="mobile-ask-title">
         <span />
         <strong>
-          <Icon name="doc" />
+          <Icon name="chat-dots" />
           你可以先问我
         </strong>
         <span />
@@ -360,25 +439,43 @@ export default function ChatPanel({ onSpeakingChange }) {
           ))}
         </div>
       </section>
+      </div>
 
       <div className="chat__inputbar">
-        <span className="chat__inputbot">
+        <button
+          type="button"
+          className={'chat__inputbot' + (recording ? ' chat__inputbot--rec' : '')}
+          onClick={recording ? stopRec : startRec}
+          disabled={loading || asrBusy}
+          aria-label={recording ? '结束录音' : '语音提问'}
+        >
           <Icon name="mic" />
-        </span>
+        </button>
         <input
           className="chat__input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && send()}
-          placeholder={isMobile ? '说说你的创业问题…' : '请输入你的创业政策问题…'}
-          disabled={loading}
+          placeholder={
+            recording
+              ? '聆听中…再次点击麦克风结束'
+              : asrBusy
+                ? '正在识别…'
+                : isMobile
+                  ? '说说你的创业问题…'
+                  : '请输入你的创业政策问题…'
+          }
+          disabled={loading || recording}
         />
         <button className="chat__send" onClick={() => send()} aria-label="发送" disabled={loading}>
           <Icon name="send" />
         </button>
       </div>
 
-      <p className="mobile-footnote">政策权威 · 信息安全 · 专业服务</p>
+      <p className="mobile-footnote">
+        <ShieldCheck size={13} strokeWidth={2} aria-hidden="true" />
+        政策权威 · 信息安全 · 专业服务
+      </p>
       <audio ref={audioRef} hidden />
     </div>
   )

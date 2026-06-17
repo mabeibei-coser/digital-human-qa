@@ -1,6 +1,9 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
+import { execFile } from 'node:child_process'
+import { writeFile, readFile, unlink } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import dotenv from 'dotenv'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -36,6 +39,12 @@ const TTS_RESOURCE = 'volc.service_type.10029'
 const TTS_APP_KEY = process.env.VOLC_TTS_APP_KEY
 const TTS_ACCESS_KEY = process.env.VOLC_TTS_ACCESS_KEY
 const TTS_SPEAKER = process.env.VOLC_TTS_SPEAKER || 'zh_female_vv_uranus_bigtts'
+
+// ── 火山 ASR（语音识别）──
+// 复用 TTS 的同一对密钥（VOLC_TTS_APP_KEY / VOLC_TTS_ACCESS_KEY）；大模型录音识别 flash 端点。
+// 端点只稳定支持 wav/mp3，浏览器录的 webm/mp4 先用 ffmpeg 转 16k 单声道 wav。
+const ASR_URL = 'https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash'
+const ASR_RESOURCE = process.env.VOLC_ASR_RESOURCE_ID || 'volc.bigasr.auc_turbo'
 
 const SYSTEM_PROMPT = `你是"创业服务智能助手"，服务于政府就业创业服务中心，面向有创业意向的市民。
 你的任务：用通俗、亲切、口语化的中文，解答创业扶持政策、开办流程、补贴申领、创业担保贷款、社保就业等问题。
@@ -85,7 +94,8 @@ app.use((req, res, next) => {
 })
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, llm: !!PRIMARY_KEY, tts: !!(TTS_APP_KEY && TTS_ACCESS_KEY) })
+  const volc = !!(TTS_APP_KEY && TTS_ACCESS_KEY)
+  res.json({ ok: true, llm: !!PRIMARY_KEY, tts: volc, asr: volc })
 })
 
 // 问答：讯飞星火，**SSE 流式**（边生成边吐字，前端按句边合成边播）。主→兜底。
@@ -221,6 +231,119 @@ async function synthesizeTTS(text, maxRetries = 2) {
     }
   }
   return ''
+}
+
+// 语音识别：浏览器录音(webm/mp4) → (ffmpeg 转 wav) → 火山 ASR → 返回 { text }
+// 前端用原始二进制直传（Content-Type: audio/webm 等），不走 JSON body 解析。
+app.post('/api/asr', async (req, res) => {
+  if (!TTS_APP_KEY || !TTS_ACCESS_KEY) return res.json({ text: '' })
+  let buf
+  try {
+    buf = await readRawBody(req, 8 * 1024 * 1024) // 8MB 上限
+  } catch (e) {
+    return res.status(413).json({ error: '录音过大' })
+  }
+  if (!buf || buf.length < 3000) return res.json({ text: '' }) // 太短，当作没说话
+  const mime = String(req.headers['content-type'] || '').toLowerCase()
+  const text = await transcribeAudio(buf, mime)
+  res.json({ text })
+})
+
+function readRawBody(req, maxBytes) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    let total = 0
+    req.on('data', (c) => {
+      total += c.length
+      if (total > maxBytes) {
+        req.destroy()
+        reject(new Error('audio too large'))
+      } else {
+        chunks.push(c)
+      }
+    })
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', reject)
+  })
+}
+
+function extFromMime(mime) {
+  if (mime.includes('webm')) return 'webm'
+  if (mime.includes('mp4') || mime.includes('m4a')) return 'mp4'
+  if (mime.includes('ogg')) return 'ogg'
+  if (mime.includes('wav')) return 'wav'
+  if (mime.includes('mp3') || mime.includes('mpeg')) return 'mp3'
+  return 'webm'
+}
+
+// 非 wav/mp3 用 ffmpeg 转 16kHz 单声道 wav（火山 flash 端点要求）
+async function convertToWav(inputBuffer, ext) {
+  const id = randomUUID().slice(0, 8)
+  const inputPath = path.join(tmpdir(), `asr-in-${id}.${ext}`)
+  const outputPath = path.join(tmpdir(), `asr-out-${id}.wav`)
+  await writeFile(inputPath, inputBuffer)
+  try {
+    await new Promise((resolve, reject) => {
+      execFile(
+        'ffmpeg',
+        ['-i', inputPath, '-ar', '16000', '-ac', '1', '-f', 'wav', '-y', outputPath],
+        { timeout: 15000 },
+        (error, _stdout, stderr) => {
+          if (error) {
+            console.error('[asr] ffmpeg 失败:', String(stderr || '').slice(-160))
+            reject(error)
+          } else resolve()
+        },
+      )
+    })
+    return await readFile(outputPath)
+  } finally {
+    unlink(inputPath).catch(() => {})
+    unlink(outputPath).catch(() => {})
+  }
+}
+
+async function transcribeAudio(audioBuffer, mimeType) {
+  const mime = (mimeType || '').toLowerCase()
+  let finalBuffer = audioBuffer
+  if (mime && !mime.includes('wav') && !mime.includes('mp3')) {
+    try {
+      finalBuffer = await convertToWav(audioBuffer, extFromMime(mime))
+    } catch (e) {
+      console.error('[asr] 转码失败:', e?.message || e)
+      return ''
+    }
+  }
+  const ctrl = new AbortController()
+  const to = setTimeout(() => ctrl.abort(), 20000)
+  try {
+    const r = await fetch(ASR_URL, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-App-Key': TTS_APP_KEY,
+        'X-Api-Access-Key': TTS_ACCESS_KEY,
+        'X-Api-Resource-Id': ASR_RESOURCE,
+        'X-Api-Request-Id': randomUUID(),
+        'X-Api-Sequence': '-1',
+      },
+      body: JSON.stringify({
+        user: { uid: randomUUID() },
+        audio: { data: finalBuffer.toString('base64') },
+        request: { model_name: 'bigmodel' },
+      }),
+    })
+    const data = await r.json()
+    if (data?.result?.text) return data.result.text
+    console.error('[asr] 无识别结果:', data?.header?.code, data?.header?.message || JSON.stringify(data).slice(0, 200))
+    return ''
+  } catch (e) {
+    console.error('[asr] 请求失败:', e?.name === 'AbortError' ? '超时' : e?.message || e)
+    return ''
+  } finally {
+    clearTimeout(to)
+  }
 }
 
 // 生产：托管 dist/

@@ -7,5 +7,5 @@ export const NO_ALPHA =
   /MicroMessenger/i.test(UA) ||
   (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 
-// 移动端纯色背景，必须与 fallback mp4 的烤底色完全一致（见 run 脚本 SOLID=(205,233,239)）
-export const PAGE_TEAL = '#cde9ef'
+// 移动端纯色背景，必须与数字人视频烤底色一致（视频烤底为近白影棚底，采样约 #fafafa）
+export const PAGE_TEAL = '#fafafa'

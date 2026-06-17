@@ -55,11 +55,20 @@ npm run dev      # concurrently 同时起 vite(:3008) + node server.js(:4009)
 - [x] **真 AI 语音问答**（讯飞星火 + 豆包 TTS），本机端到端验证通过
 - [x] 前序页（「进入 3D 数字人演示」按钮 → 同文档切换到问答页，借这次手势直接有声播欢迎语，含 iOS/微信）
 - [x] **已部署到 /a900**（线上 https://h100.jsai100.com/a900/，pm2 常驻、nginx /a900/→3011 反代且 buffering off）
-- [ ]（可选）接 ASR 做「按住说话」语音提问
+- [x] **手机页精致化**（对照设计图3：图标线条调细、标题字号/字重降档、热门事项拆成独立小卡、面板可轻微滚动；只改手机端，桌面不动）
+- [x] **接 ASR 语音提问**（点麦克风录音→火山 ASR→自动当问题发出）：复用 TTS 同密钥，`POST /api/asr`（原始音频直传，webm/mp4 经 ffmpeg 转 wav），本机 TTS→ASR 端到端自测通过（mp3/webm 双路径准确）
+
+## ASR 接入要点（新增）
+
+- 后端 `server.js` 新增 `/api/asr`：读原始二进制音频 → 火山 `recognize/flash` 端点 → `{ text }`。密钥复用 `VOLC_TTS_APP_KEY/ACCESS_KEY`，可选 `VOLC_ASR_RESOURCE_ID`（默认 `volc.bigasr.auc_turbo`）。
+- 前端 `ChatPanel.jsx`：麦克风从装饰 span 改为 button，点开始/再点结束录音，识别成功自动 `send()`。仅手机端显示（桌面输入栏无麦克风）。
+- **部署依赖**：服务器需装 **ffmpeg**（webm→wav 转码用）。本机已有；腾讯 Lighthouse 上线前需确认 `ffmpeg -version` 可用，否则录音转码失败（仅影响语音，文字问答不受影响）。
 
 ## Agent Handoff
 
-- 当前主 Agent：Claude
-- 上一手完成：加前序页（进入按钮 + 跳转后直接播欢迎语）；已部署 v0.2.6 到 /a900，线上 200 + health ok
-- 必读上下文：本文件 + `DEPLOY.md` + `.planning/2026-06-16-A900-数字人问答.md`
-- 决策状态：绿灯（已上线运行）；后续发版直接走 tencent-deploy 的 update 流（git pull + restart，端口 3011）
+- 当前主 Agent：Claude（上一手：手机页精致化 + 接 ASR）
+- 上一手完成：手机页对照设计图精致化（图标/字号/热门拆卡/滚动）+ 接入火山 ASR 语音提问；本机视觉(DOM 度量 390/375 无溢出)+ASR(端到端自测)均通过。**改动未提交、未部署**。
+- 下一手建议：codex 走 tencent-deploy update 流上线（git pull + restart，端口 3011）；**上线前确认服务器装了 ffmpeg**。
+- 必读上下文：本文件 + `DEPLOY.md` + `.planning/2026-06-17-A900-手机页精致化+ASR.md`
+- 文件占用：本次改了 `src/App.jsx`(无)、`src/components/ChatPanel.jsx`、`src/index.css`、`server.js`、`.env.example`；codex 部署只读不改这些
+- 决策状态：绿灯（功能验证通过，待部署）
