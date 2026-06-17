@@ -5,7 +5,7 @@ import { NO_ALPHA } from '../noAlpha.js'
 // 全部「静音自动播」打底——iOS/微信只允许静音视频自动播，这样各端都一定能显示画面。
 // 欢迎语音：加载后尝试解除静音（桌面/启动器允许时成功）+ 首次触摸解锁（iOS）。
 const inlineAttrs = { 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }
-const V = '13' // 视频缓存版本号（v13：intro.fallback.mp4 补回欢迎语音轨）
+const V = '14' // 视频缓存版本号（v14：提亮高光兜底淡化移动水印，背景压纯白）
 
 // iOS/微信不支持透明 WebM → 用不透明 mp4（纯色底，与页面背景同色，无拼接缝）；桌面/安卓 Chrome 用透明 webm。
 const EXT = NO_ALPHA ? '.fallback.mp4' : '.webm'
