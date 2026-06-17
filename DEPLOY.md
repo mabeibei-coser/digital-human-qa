@@ -10,7 +10,8 @@
 - 后端端口：`API_PORT=4009`（线上 nginx 把 `/a900/api/` 反代到该端口；server.js 已自动剥 `/a900` 前缀）
 - 生产 base：`/a900/`（vite.config.js，`command === 'build'` 时生效）
 - 生产启动：`npm run build` 出 dist → `NODE_ENV=production node server.js`（server.js 生产模式托管 dist/ + 提供 /api）
-- GitHub 仓库：待建（首次部署由 tencent-deploy 走 `gh repo create`）
+- GitHub 仓库：`mabeibei-coser/digital-human-qa`（已建并已上线；后续发版走 tencent-deploy 的 update 流）
+- 生产实际端口：**3011**（pm2 进程 env 里的 PORT；4009 仅本机 dev 用。重启务必 `PORT=3011 pm2 restart digital-human-qa --update-env`）
 
 ## 服务器上必须有的 .env.local（密钥，不进 git）
 

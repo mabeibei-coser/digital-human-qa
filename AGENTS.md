@@ -53,12 +53,13 @@ npm run dev      # concurrently 同时起 vite(:3008) + node server.js(:4009)
 - [x] 视觉版（背景图 + 三态数字人 + 边缘干净 + 清晰）
 - [x] 欢迎语音（首次交互解锁，无按钮；演示机可用 `演示-有声启动.bat` 保证开页即出声）
 - [x] **真 AI 语音问答**（讯飞星火 + 豆包 TTS），本机端到端验证通过
-- [ ] 部署到 /a900（带 node 后端，见 DEPLOY.md）
+- [x] 前序页（「进入 3D 数字人演示」按钮 → 同文档切换到问答页，借这次手势直接有声播欢迎语，含 iOS/微信）
+- [x] **已部署到 /a900**（线上 https://h100.jsai100.com/a900/，pm2 常驻、nginx /a900/→3011 反代且 buffering off）
 - [ ]（可选）接 ASR 做「按住说话」语音提问
 
 ## Agent Handoff
 
 - 当前主 Agent：Claude
-- 上一手完成：接入讯飞星火 + 豆包 TTS，前后端打通，本机验证答案+语音+口型联动
+- 上一手完成：加前序页（进入按钮 + 跳转后直接播欢迎语）；已部署 v0.2.6 到 /a900，线上 200 + health ok
 - 必读上下文：本文件 + `DEPLOY.md` + `.planning/2026-06-16-A900-数字人问答.md`
-- 决策状态：绿灯（本机功能完成；部署是红灯，需走 tencent-deploy + 确认）
+- 决策状态：绿灯（已上线运行）；后续发版直接走 tencent-deploy 的 update 流（git pull + restart，端口 3011）
