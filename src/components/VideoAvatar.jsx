@@ -75,7 +75,10 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
     armUnlock() // 始终挂首次触摸兜底：覆盖 iOS 省电模式（禁自动播）+ 给欢迎语音
   }, [armUnlock, autoUnlock])
 
-  // 状态切换：非 intro 态暂停 intro（停欢迎语音）并从头播当前态视频；intro 的播放由挂载 effect 管
+  // 状态切换：非 intro 态暂停 intro（停欢迎语音）；目标态视频从「当前帧」续播 + 淡入。
+  // ⚠️ 不再 reset currentTime=0：idle/speaking 是常驻循环视频，一直在后台播着、画面是好的。
+  // 强行倒带到 0 会触发透明 webm 重新解码首帧、alpha 通道短暂失效，crossfade 时露出「白闪」。
+  // 从当前帧续播则目标层始终有正常画面，淡入即平滑。
   useEffect(() => {
     const intro = introRef.current
     if (state === 'intro') {
@@ -83,10 +86,7 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
     } else {
       if (intro) intro.pause()
       const active = refs[state]?.current
-      if (active) {
-        try { active.currentTime = 0 } catch (e) { /* ignore */ }
-        active.play().catch(() => {})
-      }
+      if (active && active.paused) active.play().catch(() => {})
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
