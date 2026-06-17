@@ -300,14 +300,89 @@ export default function ChatPanel({ onSpeakingChange }) {
           </span>
           <div className="chat__titles">
             <h1>创业服务智能助手</h1>
-            <p>创业政策咨询 · 创业问答</p>
+            <p>政策咨询 · 办事指引 · 申领测算</p>
           </div>
         </div>
         <span className="chat__online">
           <i className="chat__dot" />
-          ONLINE
+          在线服务中
         </span>
       </header>
+
+      <div className="desktop-service-home">
+        <section className="desktop-ask" aria-labelledby="desktop-ask-title">
+          <header className="desktop-section-head">
+            <span className="desktop-section-head__icon">
+              <Icon name="chat-dots" />
+            </span>
+            <h2 id="desktop-ask-title">你可以先问我</h2>
+          </header>
+
+          <div className="desktop-prompt-grid">
+            {MOBILE_PROMPTS.map((item) => (
+              <button
+                key={item.key}
+                className="desktop-prompt"
+                type="button"
+                onClick={() => send(item.label)}
+                disabled={loading}
+              >
+                <span className="desktop-prompt__icon">
+                  <Icon name={item.icon} />
+                </span>
+                <span className="desktop-prompt__copy">
+                  <strong>{item.short}</strong>
+                  <small>{item.desc}</small>
+                </span>
+                <span className="desktop-card-arrow">
+                  <Icon name="chevron" />
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="desktop-hot" aria-labelledby="desktop-hot-title">
+          <header className="desktop-hot__head">
+            <div className="desktop-section-head">
+              <span className="desktop-section-head__icon desktop-section-head__icon--hot">
+                <Icon name="fire" />
+              </span>
+              <h2 id="desktop-hot-title">热门事项</h2>
+            </div>
+            <button type="button" onClick={() => send('还有哪些创业服务可以咨询？')} disabled={loading}>
+              更多服务
+              <Icon name="chevron" />
+            </button>
+          </header>
+
+          <div className="desktop-hot__list">
+            {HOT_ITEMS.map((item) => (
+              <button
+                key={item.key}
+                className="desktop-hot__item"
+                type="button"
+                onClick={() => send(item.label)}
+                disabled={loading}
+              >
+                <span className="desktop-hot__icon">
+                  <Icon name={item.icon} />
+                </span>
+                <span className="desktop-hot__copy">
+                  <strong>{item.label}</strong>
+                  <small>{item.desc}</small>
+                </span>
+                <span className="desktop-hot__tag">
+                  {item.key === 'loan' ? '贷款服务' : '补贴申领'}
+                </span>
+                <span className="desktop-card-arrow">
+                  <Icon name="chevron" />
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
 
       <div className="chat__body">
       <div className="chat__messages" ref={listRef}>
@@ -446,6 +521,14 @@ export default function ChatPanel({ onSpeakingChange }) {
       <p className="mobile-footnote">
         <ShieldCheck size={13} strokeWidth={2} aria-hidden="true" />
         政策权威 · 信息安全 · 专业服务
+      </p>
+      <p className="desktop-footnote">
+        <ShieldCheck size={17} strokeWidth={2} aria-hidden="true" />
+        <span>政策权威</span>
+        <i />
+        <span>信息安全</span>
+        <i />
+        <span>专业服务</span>
       </p>
       <audio ref={audioRef} hidden />
     </div>
