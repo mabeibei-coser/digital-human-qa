@@ -1,61 +1,88 @@
 import { useEffect, useRef, useState } from 'react'
+import {
+  Bot,
+  ChevronRight,
+  Flame,
+  Gift,
+  JapaneseYen,
+  Landmark,
+  MessageCircle,
+  Mic,
+  Send,
+  ShieldCheck,
+  Store,
+  UserRound,
+} from 'lucide-react'
 
-const WELCOME =
+const DESKTOP_WELCOME =
   '您好！我是创业服务智能助手，创业扶持政策、开办流程、补贴申领、担保贷款等问题都可以问我。'
+const MOBILE_WELCOME = '您好，我可以帮您查政策、看条件、理流程。'
 
 const SUGGESTIONS = [
-  { key: 'loan', label: '创业担保贷款怎么申请？', short: '创业担保贷款', icon: 'bank' },
-  { key: 'subsidy', label: '一次性创业补贴怎么领？', short: '一次性创业补贴', icon: 'yen' },
+  { key: 'loan', label: '创业担保贷款怎么申请？', short: '创业担保贷款', hint: '最高可贷500万', icon: 'bank' },
+  { key: 'subsidy', label: '一次性创业补贴怎么领？', short: '一次性创业补贴', hint: '最高可领10万元', icon: 'yen' },
+  { key: 'process', label: '个体工商户开办流程是什么？', short: '办理流程', hint: '查看各类业务办理步骤', icon: 'doc' },
+]
+
+const MOBILE_PROMPTS = [
+  { key: 'benefit', label: '我能领取什么补贴？', short: '我能领什么补贴', desc: '有哪些补贴可以申领', icon: 'gift' },
+  { key: 'loan-rule', label: '创业担保贷款需要什么条件？', short: '担保贷款条件', desc: '我符合贷款条件吗', icon: 'shield' },
+  { key: 'license', label: '开店办照流程是什么？', short: '开店办照流程', desc: '如何办理营业执照', icon: 'store' },
+]
+
+const HOT_ITEMS = [
+  { key: 'subsidy', label: '一次性创业补贴', desc: '符合条件可申请一次性创业补贴', icon: 'yen' },
+  { key: 'loan', label: '创业担保贷款', desc: '政府贴息担保，解决创业资金难题', icon: 'bank' },
+  { key: 'social', label: '社保补贴咨询', desc: '了解社保补贴政策及申请条件', icon: 'user' },
 ]
 
 // 子路径部署安全：BASE 在 dev 是 '/'、生产是 '/a900/'
 const BASE = import.meta.env.BASE_URL
 
+function isMobileViewport() {
+  return typeof window !== 'undefined' && window.matchMedia('(max-width: 920px)').matches
+}
+
 function Icon({ name }) {
+  const common = { size: '60%', strokeWidth: 2, 'aria-hidden': true }
   switch (name) {
     case 'bot':
-      return (
-        <svg viewBox="0 0 24 24" width="60%" height="60%" fill="none" aria-hidden="true">
-          <rect x="4" y="8" width="16" height="11" rx="4" fill="currentColor" />
-          <circle cx="9.5" cy="13.5" r="1.6" fill="#fff" />
-          <circle cx="14.5" cy="13.5" r="1.6" fill="#fff" />
-          <path d="M12 3.5v3.2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="12" cy="3" r="1.5" fill="currentColor" />
-        </svg>
-      )
+      return <Bot {...common} />
     case 'bank':
-      return (
-        <svg viewBox="0 0 24 24" width="56%" height="56%" fill="none" stroke="currentColor"
-          strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M3 9l9-5 9 5" />
-          <path d="M5 9v8M9.5 9v8M14.5 9v8M19 9v8" />
-          <path d="M3 20h18" />
-        </svg>
-      )
+      return <Landmark {...common} />
     case 'yen':
-      return (
-        <svg viewBox="0 0 24 24" width="56%" height="56%" fill="none" stroke="currentColor"
-          strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M7 5l5 6.5L17 5" />
-          <path d="M12 11.5V19" />
-          <path d="M8.2 14h7.6M8.2 16.6h7.6" />
-        </svg>
-      )
+      return <JapaneseYen {...common} />
+    case 'doc':
+      return <MessageCircle {...common} />
+    case 'gift':
+      return <Gift {...common} />
+    case 'shield':
+      return <ShieldCheck {...common} />
+    case 'store':
+      return <Store {...common} />
+    case 'user':
+      return <UserRound {...common} />
+    case 'fire':
+      return <Flame {...common} />
+    case 'mic':
+      return <Mic {...common} />
+    case 'chevron':
+      return <ChevronRight {...common} />
     case 'send':
-      return (
-        <svg viewBox="0 0 24 24" width="48%" height="48%" fill="currentColor" aria-hidden="true">
-          <path d="M3.2 20.6l18-8.2a1 1 0 000-1.8l-18-8.2a.7.7 0 00-1 .82L4.7 10.4 14 11.5l-9.3 1.1-2.5 7.2a.7.7 0 001 .8z" />
-        </svg>
-      )
+      return <Send size="52%" strokeWidth={2.2} aria-hidden="true" />
     default:
       return null
   }
 }
 
 export default function ChatPanel({ onSpeakingChange }) {
-  const [messages, setMessages] = useState([{ role: 'assistant', text: WELCOME }])
+  const [messages, setMessages] = useState(() => [{
+    role: 'assistant',
+    text: isMobileViewport() ? MOBILE_WELCOME : DESKTOP_WELCOME,
+  }])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const isMobile = isMobileViewport()
   const listRef = useRef(null)
   const audioRef = useRef(null)
 
@@ -216,7 +243,7 @@ export default function ChatPanel({ onSpeakingChange }) {
   }
 
   return (
-    <div className="chat">
+    <div className={'chat' + (messages.length > 1 ? ' chat--active' : '')}>
       <header className="chat__head">
         <div className="chat__brand">
           <span className="chat__logo">
@@ -262,18 +289,88 @@ export default function ChatPanel({ onSpeakingChange }) {
             <span className="sg__icon">
               <Icon name={s.icon} />
             </span>
-            <span className="sg__label">{s.short}</span>
+            <span className="sg__copy">
+              <span className="sg__label">{s.short}</span>
+              <span className="sg__hint">{s.hint}</span>
+            </span>
           </button>
         ))}
       </div>
 
+      <div className="mobile-ask-title">
+        <span />
+        <strong>
+          <Icon name="doc" />
+          你可以先问我
+        </strong>
+        <span />
+      </div>
+
+      <div className="mobile-prompt-grid">
+        {MOBILE_PROMPTS.map((item) => (
+          <button
+            key={item.key}
+            className="mobile-prompt"
+            onClick={() => send(item.label)}
+            disabled={loading}
+          >
+            <span className="mobile-prompt__icon">
+              <Icon name={item.icon} />
+            </span>
+            <span className="mobile-prompt__label">{item.short}</span>
+            <small>{item.desc}</small>
+          </button>
+        ))}
+      </div>
+
+      <section className="mobile-hot">
+        <header className="mobile-hot__head">
+          <strong>
+            <span className="mobile-hot__fire">
+              <Icon name="fire" />
+            </span>
+            热门事项
+          </strong>
+          <button type="button" onClick={() => send('还有哪些创业服务可以咨询？')} disabled={loading}>
+            更多服务
+            <Icon name="chevron" />
+          </button>
+        </header>
+
+        <div className="mobile-hot__list">
+          {HOT_ITEMS.map((item) => (
+            <button
+              key={item.key}
+              className="mobile-hot__item"
+              type="button"
+              onClick={() => send(item.label)}
+              disabled={loading}
+            >
+              <span className="mobile-hot__icon">
+                <Icon name={item.icon} />
+              </span>
+              <span className="mobile-hot__copy">
+                <strong>{item.label}</strong>
+                <small>{item.desc}</small>
+              </span>
+              <span className="mobile-hot__arrow">
+                <Icon name="chevron" />
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
       <div className="chat__inputbar">
+        <span className="chat__inputbot">
+          <Icon name="mic" />
+        </span>
         <input
           className="chat__input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && send()}
-          placeholder="请输入你的创业政策问题…"
+          placeholder={isMobile ? '说说你的创业问题…' : '请输入你的创业政策问题…'}
           disabled={loading}
         />
         <button className="chat__send" onClick={() => send()} aria-label="发送" disabled={loading}>
@@ -281,6 +378,7 @@ export default function ChatPanel({ onSpeakingChange }) {
         </button>
       </div>
 
+      <p className="mobile-footnote">政策权威 · 信息安全 · 专业服务</p>
       <audio ref={audioRef} hidden />
     </div>
   )

@@ -14,27 +14,47 @@ export default function App() {
   const [avatarState, setAvatarState] = useState('intro')
 
   // 桌面：背景大图 + 透明数字人；iOS/微信：纯色青绿 + 不透明数字人（同色，无拼接缝）
+  const bgUrl = `${import.meta.env.BASE_URL}bg.jpg`
+  const mobileBgUrl = `${import.meta.env.BASE_URL}mobile-service-hall-bg.png`
   const pageStyle = NO_ALPHA
-    ? { background: PAGE_TEAL }
-    : { backgroundImage: `url(${import.meta.env.BASE_URL}bg.jpg)` }
+    ? { background: PAGE_TEAL, '--mobile-bg': `url(${mobileBgUrl})` }
+    : { backgroundImage: `url(${bgUrl})`, '--mobile-bg': `url(${mobileBgUrl})` }
 
   return (
     <div className="page" style={pageStyle}>
-      {!entered ? (
-        <Landing onEnter={() => setEntered(true)} />
-      ) : (
-        <div className="layout">
-          <section className="avatar-col">
-            <div className="avatar-stage">
-              <div className="avatar-platform" />
-              <VideoAvatar state={avatarState} autoUnlock onIntroEnd={() => setAvatarState('idle')} />
-            </div>
-          </section>
-          <section className="chat-col">
-            <ChatPanel onSpeakingChange={(on) => setAvatarState(on ? 'speaking' : 'idle')} />
-          </section>
+      {!entered && (
+        <div className="desktop-landing">
+          <Landing onEnter={() => setEntered(true)} />
         </div>
       )}
+
+      <div className={'layout' + (entered ? '' : ' is-mobile-direct')}>
+        <section className="avatar-col">
+          <div className="mobile-hero-copy">
+            <h1>
+              <span>创业服务</span>
+              <span>智能助手</span>
+            </h1>
+            <p>政策咨询 · 办事指引 · 申领测算</p>
+            <span className="mobile-hero-copy__online">
+              <i />
+              在线服务中
+            </span>
+          </div>
+
+          <div className="avatar-stage">
+            <div className="avatar-platform" />
+            <VideoAvatar
+              state={avatarState}
+              autoUnlock={entered}
+              onIntroEnd={() => setAvatarState('idle')}
+            />
+          </div>
+        </section>
+        <section className="chat-col">
+          <ChatPanel onSpeakingChange={(on) => setAvatarState(on ? 'speaking' : 'idle')} />
+        </section>
+      </div>
     </div>
   )
 }
