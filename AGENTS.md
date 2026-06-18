@@ -58,7 +58,7 @@ npm run dev      # concurrently 同时起 vite(:3008) + node server.js(:4009)
 - [x] **手机页精致化**（对照设计图3：图标线条调细、标题字号/字重降档、热门事项拆成独立小卡、面板可轻微滚动；只改手机端，桌面不动）
 - [x] **接 ASR 语音提问**（点麦克风录音→火山 ASR→自动当问题发出）：复用 TTS 同密钥，`POST /api/asr`（原始音频直传，webm/mp4 经 ffmpeg 转 wav），本机 TTS→ASR 端到端自测通过（mp3/webm 双路径准确）
 - [x] **第二个数字人形象（3D 数字仿真人）**：落地页「3D 数字仿真人演示」按钮接通（原是 alert 占位），点进去是**同一套页面/问答/语音**，只换人物视频（白底新形象）。形象配置收敛到单一来源 `src/avatars.js`，`VideoAvatar` 加 `variant` 入参；本机 DOM 度量两入口视频源切换正确、画面渲染播放均通过。
-  - 新视频在 `public/avatar-sim/`（待机→idle、欢迎→intro，均 HEVC 转码为 H.264 白底）；**说话视频未生成**，暂用欢迎视频占位（`avatars.js` 里 `sim.files.speaking: 'intro'`），生成后改一行 + 放 `speaking.fallback.mp4` 即可。
+  - 新视频在 `public/avatar-sim/`（待机→idle、欢迎→intro、说话→speaking，H.264 白底）。**三态齐全**：用户重导的高清三视频已替换占位，`avatars.js` 里 `sim.files.speaking` 已从占位 `'intro'` 改回真 `'speaking'`。欢迎源是 1920×1080 横屏，已中心裁剪+缩放成 9:16 竖屏（720×1280）与其余两态一致；欢迎视频自带欢迎语音轨保留；说话源 1080×1920、idle 720×1280（均 9:16，object-fit 统一显示）。
 
 ## ASR 接入要点（新增）
 
@@ -68,9 +68,9 @@ npm run dev      # concurrently 同时起 vite(:3008) + node server.js(:4009)
 
 ## Agent Handoff
 
-- 当前主 Agent：Claude（上一手：新增第二个数字人形象「3D 数字仿真人」）
-- 上一手完成：落地页第二个按钮接通成「同页面换形象」；形象配置收敛到单一来源 `src/avatars.js`（改一处两处同步），`VideoAvatar` 加 `variant` 入参；新视频转码进 `public/avatar-sim/`（说话态暂用欢迎占位）。本机 preview DOM 度量两入口视频源切换正确、渲染播放通过。**改动未提交、未部署**；ASR 那一手也仍未部署。
-- 下一手建议：codex 走 tencent-deploy update 流上线（git pull + restart，端口 3011）；**上线前确认服务器装了 ffmpeg**（ASR 用）。git add 含 `public/avatar-sim/*.mp4`（约 1.3MB，体积同现有 avatar，无需 LFS）。
+- 当前主 Agent：Claude（上一手：替换 3D 数字仿真人三态视频为用户重导的高清版）
+- 上一手完成：用用户重导的高清三视频替换 `public/avatar-sim/` 占位——idle/intro/speaking 三态齐全；欢迎源是横屏 1920×1080，已中心裁剪+缩放成 9:16 竖屏与另两态对齐，欢迎语音轨保留；说话从占位 `'intro'` 改回真 `'speaking'`（`src/avatars.js`）；缓存版本号 `VideoAvatar.jsx` V18→V19；poster.jpg 按新 idle 首帧重生。本机 preview 三态视频均 readyState4 无报错、路径/尺寸/9:16 度量正确（screenshot 因渲染器卡超时，已用 DOM 度量 + ffmpeg 抽帧目视替代）。**改动未提交、未部署**；ASR 那一手也仍未部署。
+- 下一手建议：codex 走 tencent-deploy update 流上线（git pull + restart，端口 3011）；**上线前确认服务器装了 ffmpeg**（ASR 用）。git add 含 `public/avatar-sim/*.mp4` + `poster.jpg`（约 3.1MB，无需 LFS）。
 - 必读上下文：本文件 + `DEPLOY.md` + `src/avatars.js`（形象单一来源）
-- 文件占用：本次新增 `src/avatars.js`、`public/avatar-sim/`，改了 `src/App.jsx`、`src/components/VideoAvatar.jsx`；codex 部署只读不改这些
-- 决策状态：绿灯（功能验证通过，待部署）；待办：真说话视频生成后替换占位
+- 文件占用：本次改了 `public/avatar-sim/*`、`src/avatars.js`、`src/components/VideoAvatar.jsx`；codex 部署只读不改这些
+- 决策状态：绿灯（功能验证通过，待部署）；占位说话视频待办已清

@@ -6,7 +6,7 @@ import { AVATARS } from '../avatars.js'
 // 全部「静音自动播」打底——iOS/微信只允许静音视频自动播，这样各端都一定能显示画面。
 // 欢迎语音：加载后尝试解除静音（桌面/启动器允许时成功）+ 首次触摸解锁（iOS）。
 const inlineAttrs = { 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }
-const V = '18' // v18: re-exported clips with clean white background (old ones had black edges).
+const V = '19' // v19: re-exported HD sim clips (real speaking clip; welcome normalized to 9:16 portrait).
 
 // Use the same MP4 clips everywhere; the supplied source clips were HEVC,
 // so these project assets are browser-safe H.264 transcodes on a pure-white (#fff) studio matte.
