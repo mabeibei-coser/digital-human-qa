@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Flame,
   Gift,
+  Home,
   JapaneseYen,
   Landmark,
   MessageCircle,
@@ -14,6 +15,7 @@ import {
   Store,
   UserRound,
 } from 'lucide-react'
+import './chat-home-button.css'
 
 const DESKTOP_WELCOME =
   '您好！我是创业服务智能助手，创业扶持政策、开办流程、补贴申领、担保贷款等问题都可以问我。'
@@ -332,8 +334,22 @@ export default function ChatPanel({ onSpeakingChange }) {
     setLoading(false)
   }
 
+  // 返回主页：清空当前对话，回到欢迎页（你可以先问我 + 热门事项）。AI 作答中不打断。
+  function resetToHome() {
+    if (loading) return
+    const a = audioRef.current
+    if (a) {
+      try { a.pause(); a.currentTime = 0 } catch (e) { /* ignore */ }
+    }
+    setInput('')
+    setMessages([{ role: 'assistant', text: isMobileViewport() ? MOBILE_WELCOME : DESKTOP_WELCOME }])
+    onSpeakingChange?.(false) // 数字人回到待命态
+  }
+
+  const active = messages.length > 1
+
   return (
-    <div className={'chat' + (messages.length > 1 ? ' chat--active' : '')}>
+    <div className={'chat' + (active ? ' chat--active' : '')}>
       <header className="chat__head">
         <div className="chat__brand">
           <span className="chat__logo">
@@ -426,6 +442,20 @@ export default function ChatPanel({ onSpeakingChange }) {
       </div>
 
       <div className="chat__body">
+      {active && (
+        <div className="chat__home-row">
+          <button
+            type="button"
+            className="chat__home-btn"
+            onClick={resetToHome}
+            disabled={loading}
+            aria-label="返回主页"
+          >
+            <Home size={16} strokeWidth={2.2} aria-hidden="true" />
+            返回主页
+          </button>
+        </div>
+      )}
       <div className="chat__messages" ref={listRef}>
         {messages.map((m, i) => (
           <div key={i} className={'msg msg--' + (m.role === 'assistant' ? 'bot' : 'user')}>

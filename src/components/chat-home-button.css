@@ -1,0 +1,51 @@
+/* 「返回主页」按钮：问答进行中显示在对话顶部，点了清空当前对话、回到欢迎页
+   （你可以先问我 + 热门事项）。样式单独成文件、不并入 index.css ——
+   避免与并行进行中的落地页改版抢同一个文件。桌面靠右、手机靠左，两端都在对话上方。 */
+.chat__home-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 26px 8px;
+}
+
+.chat__home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #08877d;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(8, 170, 156, 0.42);
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 10px 24px -18px rgba(8, 135, 125, 0.6);
+  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.12s ease;
+}
+
+.chat__home-btn:hover {
+  background: #08877d;
+  color: #fff;
+  box-shadow: 0 14px 28px -16px rgba(8, 135, 125, 0.7);
+}
+
+.chat__home-btn:active {
+  transform: translateY(1px);
+}
+
+.chat__home-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (max-width: 920px) {
+  .chat__home-row {
+    justify-content: flex-start;
+    padding: 2px 6px 10px;
+  }
+  .chat__home-btn {
+    padding: 7px 14px;
+    font-size: 13.5px;
+  }
+}
