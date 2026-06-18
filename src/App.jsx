@@ -13,6 +13,15 @@ export default function App() {
   // 回答时由 ChatPanel 的 TTS 播放驱动 speaking（播放期间嘴动，播完回 idle）。
   const [avatarState, setAvatarState] = useState('intro')
 
+  // 当前数字人形象（哪套视频）。两个入口除了形象不同，其余页面完全共用。见 src/avatars.js。
+  const [variant, setVariant] = useState('default')
+
+  function enter(which) {
+    setVariant(which)
+    setAvatarState('intro') // 每次进场重新播一次欢迎
+    setEntered(true)
+  }
+
   // 桌面：背景大图 + 透明数字人；iOS/微信：纯色 + 不透明数字人（同色，无拼接缝）
   const bgUrl = `${import.meta.env.BASE_URL}bg.jpg`
   const mobileBgUrl = `${import.meta.env.BASE_URL}mobile-service-hall-bg.png`
@@ -30,8 +39,8 @@ export default function App() {
       {!entered && (
         <div className="home-landing">
           <Landing
-            onEnter={() => setEntered(true)}
-            onSim={() => alert('3D 数字仿真人演示即将上线，敬请期待')}
+            onEnter={() => enter('default')}
+            onSim={() => enter('sim')}
           />
         </div>
       )}
@@ -62,6 +71,8 @@ export default function App() {
           <div className="avatar-stage">
             <div className="avatar-platform" />
             <VideoAvatar
+              key={variant}
+              variant={variant}
               state={avatarState}
               autoUnlock={entered}
               onIntroEnd={() => setAvatarState('idle')}

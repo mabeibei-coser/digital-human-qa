@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NO_ALPHA } from '../noAlpha.js'
+import { AVATARS } from '../avatars.js'
 
 // 三态视频数字人：idle/speaking 静音循环常驻（crossfade）；intro 进场播一次。
 // 全部「静音自动播」打底——iOS/微信只允许静音视频自动播，这样各端都一定能显示画面。
@@ -11,13 +12,15 @@ const V = '18' // v18: re-exported clips with clean white background (old ones h
 // so these project assets are browser-safe H.264 transcodes on a pure-white (#fff) studio matte.
 const EXT = '.fallback.mp4'
 
+// 三态固定元数据（哪态循环）；每态实际加载的视频文件名来自所选形象（见 ../avatars.js）。
 const CLIPS = [
-  { key: 'idle', file: 'idle', loop: true },
-  { key: 'intro', file: 'intro', loop: false },
-  { key: 'speaking', file: 'speaking', loop: true },
+  { key: 'idle', loop: true },
+  { key: 'intro', loop: false },
+  { key: 'speaking', loop: true },
 ]
 
-export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = false }) {
+export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = false, variant = 'default' }) {
+  const { dir, files } = AVATARS[variant] || AVATARS.default
   const idleRef = useRef(null)
   const introRef = useRef(null)
   const speakingRef = useRef(null)
@@ -29,7 +32,7 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
   const [prevState, setPrevState] = useState(null)
   const prevStateRef = useRef(state)
   const armedRef = useRef(false)
-  const base = import.meta.env.BASE_URL + 'avatar/'
+  const base = import.meta.env.BASE_URL + dir
 
   // 首次交互：解除 intro 静音（若还在播），让欢迎语音出声。只解静音、不重播、不改状态。
   const armUnlock = useCallback(() => {
@@ -117,7 +120,7 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
             'avatar__clip' +
             (state === c.key ? ' is-shown' : prevState === c.key ? ' is-prev' : '')
           }
-          src={base + c.file + EXT + '?v=' + V}
+          src={base + files[c.key] + EXT + '?v=' + V}
           poster={base + 'poster.jpg?v=' + V}
           muted={c.key === 'intro' ? introMuted : true}
           autoPlay
