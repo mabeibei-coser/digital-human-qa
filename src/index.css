@@ -463,21 +463,20 @@ body {
     overflow: hidden;
     -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 9%, #000 91%, transparent 100%);
     mask-image: linear-gradient(90deg, transparent 0%, #000 9%, #000 91%, transparent 100%);
+    /* 抠白底的 multiply 放到整组父层来做：两个视频先在组内「普通叠化」交叉淡入，整组
+       再对背景正片叠底一次。避免「每层各自 multiply」在交叉淡入时同一处被叠两次——那正是
+       切换时变暗（叠两次）/发晃（亮度忽变）的根源。isolation 确保子层先成组再整体 multiply。 */
+    isolation: isolate;
+    mix-blend-mode: multiply;
   }
 
+  /* 单层视频本身用普通混合（不再各自 multiply，multiply 已提到 .avatar 父层）。
+     于是两态交叉用回「上一态垫底不透明 + 新态淡入」的稳态叠化：白底盖白底，人物始终是实的，
+     不变暗、不发灰、不发晃；整组只对背景正片叠底一次。is-prev 沿用全局规则（opacity:1）。 */
   .avatar__clip {
     object-fit: cover;
     object-position: 100% center;
     filter: brightness(1.06) contrast(1.05);
-    mix-blend-mode: multiply;
-  }
-
-  /* 桌面靠 mix-blend-mode: multiply 把白色烤底「抠」掉（白×底=底）。若沿用「上一态保持
-     不透明垫底 + 新态淡入」，过渡期两层都在 multiply → 同一处被正片叠底两次，明显「暗一下」。
-     桌面改成对称交叉淡出：上一态随新态同步淡出，任一时刻只有一层接近满不透明，消除双重 multiply。
-     （移动端无 multiply、不受影响，仍保留垫底淡入。） */
-  .avatar__clip.is-prev {
-    opacity: 0;
   }
 
   .avatar-platform {
