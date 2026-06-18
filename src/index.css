@@ -1204,6 +1204,17 @@ body {
     mask-image: radial-gradient(ellipse 62% 130% at 50% 55%, #000 0 78%, rgba(0, 0, 0, 0.82) 88%, transparent 100%);
   }
 
+  .avatar--sim .avatar__clip {
+    transform: translate(10px, 380px) scale(2.08);
+    transition-duration: 520ms;
+    -webkit-mask-image: radial-gradient(ellipse 39% 130% at 65% 55%, #000 0 68%, rgba(0, 0, 0, 0.84) 82%, transparent 100%);
+    mask-image: radial-gradient(ellipse 39% 130% at 65% 55%, #000 0 68%, rgba(0, 0, 0, 0.84) 82%, transparent 100%);
+  }
+
+  .avatar--sim .avatar__clip--idle {
+    transform: translate(10px, 410px) scale(2.08);
+  }
+
   .avatar-platform {
     bottom: 11px;
     width: min(45%, 176px);

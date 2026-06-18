@@ -104,20 +104,20 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
     if (prevStateRef.current === state) return
     setPrevState(prevStateRef.current)
     prevStateRef.current = state
-    const t = setTimeout(() => setPrevState(null), 300)
+    const t = setTimeout(() => setPrevState(null), variant === 'sim' ? 620 : 300)
     return () => clearTimeout(t)
-  }, [state])
+  }, [state, variant])
 
   const allFailed = CLIPS.every((c) => failed[c.key])
 
   return (
-    <div className="avatar">
+    <div className={'avatar avatar--' + variant}>
       {CLIPS.map((c) => (
         <video
           key={c.key}
           ref={refs[c.key]}
           className={
-            'avatar__clip' +
+            'avatar__clip avatar__clip--' + c.key +
             (state === c.key ? ' is-shown' : prevState === c.key ? ' is-prev' : '')
           }
           src={base + files[c.key] + EXT + '?v=' + V}
