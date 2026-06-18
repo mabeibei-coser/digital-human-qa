@@ -7,5 +7,5 @@ export const NO_ALPHA =
   /MicroMessenger/i.test(UA) ||
   (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 
-// 移动端纯色背景，必须与数字人视频烤底色一致（视频烤底为近白影棚底，采样约 #fafafa）
-export const PAGE_TEAL = '#fafafa'
+// 移动端纯色背景，必须与数字人视频烤底色一致（v18 视频烤底已重导为纯白 #fff 影棚底）
+export const PAGE_TEAL = '#ffffff'

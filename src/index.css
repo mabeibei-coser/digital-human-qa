@@ -1103,7 +1103,7 @@ body {
 
   .page {
     height: 100dvh;
-    background-color: #fafafa !important;
+    background-color: #ffffff !important;
     background-image: none !important;
   }
 
@@ -1119,7 +1119,7 @@ body {
     justify-content: flex-start;
     gap: 0;
     overflow: hidden;
-    background: linear-gradient(180deg, #fafafa 0%, #fcfcfc 58%, #ffffff 100%);
+    background: #ffffff;
   }
 
   .avatar-col {
@@ -1129,7 +1129,7 @@ body {
     height: 364px;
     display: block;
     padding: max(18px, env(safe-area-inset-top)) 34px 0;
-    background: #fafafa; /* 纯色底 = 数字人视频烤底色，两者同色→iPhone/微信无色块缝 */
+    background: #ffffff; /* 纯白 = 数字人视频烤底色(#fff)，两者同色→iPhone/微信无色块缝 */
     overflow: hidden;
   }
 
