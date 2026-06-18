@@ -472,6 +472,14 @@ body {
     mix-blend-mode: multiply;
   }
 
+  /* 桌面靠 mix-blend-mode: multiply 把白色烤底「抠」掉（白×底=底）。若沿用「上一态保持
+     不透明垫底 + 新态淡入」，过渡期两层都在 multiply → 同一处被正片叠底两次，明显「暗一下」。
+     桌面改成对称交叉淡出：上一态随新态同步淡出，任一时刻只有一层接近满不透明，消除双重 multiply。
+     （移动端无 multiply、不受影响，仍保留垫底淡入。） */
+  .avatar__clip.is-prev {
+    opacity: 0;
+  }
+
   .avatar-platform {
     bottom: 0;
     width: 72%;
