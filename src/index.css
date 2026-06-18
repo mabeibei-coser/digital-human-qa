@@ -27,26 +27,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* 桌面默认：浅色政务服务页面；手机样式在下方媒体查询内单独覆盖 */
+/* 桌面默认：浅色政务服务页面。背景保持近白（数字人视频是白底烤像，
+   只有页面也接近白色，视频那块白底才不会显得突兀／露出拼接缝）。
+   手机样式在下方媒体查询内单独覆盖。 */
 .page {
   position: relative;
   height: 100%;
   overflow: hidden;
   background:
     linear-gradient(120deg, rgba(241, 249, 251, 0.96) 0%, rgba(255, 255, 255, 0.98) 54%, #ffffff 100%) !important;
-}
-
-.page::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(90deg, rgba(8, 170, 156, 0.05) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(11, 33, 61, 0.04) 1px, transparent 1px);
-  background-size: 92px 92px;
-  mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 56%, transparent 72%);
-  opacity: 0.32;
 }
 
 .home-landing {
@@ -522,32 +511,32 @@ body {
 
   .chat__titles h1 {
     color: var(--navy);
-    font-size: clamp(42px, 4.25vw, 62px);
-    line-height: 1.05;
+    font-size: clamp(32px, 3vw, 44px);
+    line-height: 1.1;
     font-weight: 800;
     letter-spacing: 0;
     text-wrap: balance;
   }
 
   .chat__titles p {
-    margin: 10px 0 0;
-    color: #465773;
-    font-size: clamp(20px, 1.85vw, 27px);
+    margin: 8px 0 0;
+    color: #46637a;
+    font-size: clamp(15px, 1.3vw, 18px);
     line-height: 1.35;
     font-weight: 500;
     letter-spacing: 0;
   }
 
   .chat__online {
-    min-height: 40px;
-    padding: 0 18px;
-    gap: 10px;
+    min-height: 34px;
+    padding: 0 14px;
+    gap: 8px;
     color: var(--teal-deep);
-    background: rgba(255, 255, 255, 0.78);
-    border: 1px solid rgba(8, 170, 156, 0.22);
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(8, 170, 156, 0.24);
     border-radius: 999px;
     box-shadow: 0 12px 26px -20px rgba(8, 135, 125, 0.55);
-    font-size: 18px;
+    font-size: 14.5px;
     font-weight: 700;
     letter-spacing: 0;
   }
@@ -561,19 +550,20 @@ body {
 
   .desktop-service-home {
     display: grid;
-    gap: 12px;
+    gap: 18px;
   }
 
+  /* 章节本身透明：标题直接落在青绿背景上，只有卡片/列表是白的（对齐设计图1） */
   .desktop-ask,
   .desktop-hot {
-    background: rgba(255, 255, 255, 0.92);
-    border: 1px solid rgba(214, 226, 236, 0.95);
-    border-radius: 22px;
-    box-shadow: var(--shadow);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .desktop-ask {
-    padding: 16px 20px 18px;
+    padding: 2px 2px 0;
   }
 
   .desktop-section-head {
@@ -615,20 +605,20 @@ body {
   .desktop-prompt {
     position: relative;
     min-width: 0;
-    min-height: 118px;
+    min-height: 112px;
     display: grid;
-    justify-items: center;
-    align-content: center;
-    gap: 8px;
-    padding: 16px 14px 18px;
+    justify-items: start;
+    align-content: start;
+    gap: 11px;
+    padding: 18px 16px 16px;
     color: inherit;
-    background: linear-gradient(180deg, #ffffff 0%, #fbfefd 100%);
-    border: 1px solid #dce8ef;
+    background: #ffffff;
+    border: 1px solid rgba(214, 232, 226, 0.9);
     border-radius: 18px;
-    box-shadow: 0 14px 32px -30px rgba(10, 42, 70, 0.45);
+    box-shadow: 0 22px 44px -34px rgba(8, 78, 72, 0.5), 0 6px 18px -16px rgba(8, 78, 72, 0.34);
     cursor: pointer;
     font: inherit;
-    text-align: center;
+    text-align: left;
     transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   }
 
@@ -648,16 +638,19 @@ body {
   }
 
   .desktop-prompt__icon {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     display: grid;
     place-items: center;
+    border-radius: 14px;
     color: var(--teal-deep);
+    background: #e6f6f1;
   }
 
   .desktop-prompt__copy {
     min-width: 0;
     display: grid;
+    justify-items: start;
     gap: 5px;
   }
 
@@ -686,13 +679,11 @@ body {
   }
 
   .desktop-prompt .desktop-card-arrow {
-    position: absolute;
-    right: 12px;
-    bottom: 12px;
+    display: none;
   }
 
   .desktop-hot {
-    padding: 14px 20px 16px;
+    padding: 2px 2px 0;
   }
 
   .desktop-hot__head {
@@ -700,7 +691,7 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding-bottom: 10px;
+    padding-bottom: 12px;
   }
 
   .desktop-hot__head button {
@@ -731,9 +722,10 @@ body {
   .desktop-hot__list {
     display: grid;
     overflow: hidden;
-    border: 1px solid #dde8ef;
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(214, 232, 226, 0.9);
+    border-radius: 20px;
+    background: #ffffff;
+    box-shadow: 0 24px 52px -36px rgba(8, 78, 72, 0.5), 0 8px 22px -20px rgba(8, 78, 72, 0.4);
   }
 
   .desktop-hot__item {
@@ -854,11 +846,11 @@ body {
   .chat__inputbar {
     min-height: 68px;
     margin-top: 12px;
-    padding: 7px 7px 7px 12px;
+    padding: 9px 12px;
     gap: 10px;
     background: rgba(255, 255, 255, 0.94);
     border: 1px solid rgba(214, 226, 236, 0.98);
-    border-radius: 24px;
+    border-radius: 22px;
     box-shadow: var(--shadow);
   }
 
@@ -906,39 +898,32 @@ body {
   }
 
   .chat__send {
-    width: auto;
-    min-width: 104px;
-    height: 58px;
+    width: 50px;
+    height: 50px;
+    min-width: 0;
     min-height: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin: -2px -2px -2px 0;
-    padding: 0 18px;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    padding: 0;
     border: 0;
-    border-radius: 20px;
+    border-radius: 50%;
     outline: 0;
     appearance: none;
     background-clip: padding-box;
     background: linear-gradient(135deg, #12b8a9, #068c82);
-    box-shadow: 0 18px 32px -18px rgba(8, 135, 125, 0.8);
-    font-weight: 800;
+    box-shadow: 0 12px 24px -14px rgba(8, 135, 125, 0.7);
     transition: transform 0.16s ease, box-shadow 0.16s ease;
   }
 
+  /* 圆形发送按钮：只留纸飞机图标（对齐设计图1/图2，与左侧麦克风同形），不显示「发送」文字 */
   .chat__send::after {
-    content: '发送';
-    flex: none;
-    color: #fff;
-    font-size: 16px;
-    line-height: 1;
-    white-space: nowrap;
+    content: none;
   }
 
   .chat__send svg {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     flex: none;
   }
 
