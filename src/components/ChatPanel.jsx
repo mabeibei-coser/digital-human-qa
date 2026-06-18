@@ -44,6 +44,21 @@ function isMobileViewport() {
   return typeof window !== 'undefined' && window.matchMedia('(max-width: 920px)').matches
 }
 
+// 把流式文本切成「已完结的整句」+「还没说完的尾巴」。
+// 句末标点：。！？!?…（含其后的引号/括号），分号/逗号不切——切得越碎语音越断，整句更连贯。
+function splitSentences(text) {
+  const sentences = []
+  const re = /[。！？!?…]+["'』」）)】]*/g
+  let last = 0
+  let m
+  while ((m = re.exec(text)) !== null) {
+    const end = m.index + m[0].length
+    sentences.push(text.slice(last, end))
+    last = end
+  }
+  return { sentences, rest: text.slice(last) }
+}
+
 function Icon({ name }) {
   const common = { size: '60%', strokeWidth: 2, 'aria-hidden': true }
   switch (name) {
@@ -91,7 +106,7 @@ export default function ChatPanel({ onSpeakingChange }) {
   const listRef = useRef(null)
   const audioRef = useRef(null)
 
-  // TTS：答案文字全部生成完后，再一次性合成整段语音播放（数字人开口与语音严格同步）
+  // TTS：边吐字边按「每满 2 句」合成播放（首段也要凑够 2 句再开口），避免一句一合成导致语音断断续续
 
   // 语音提问（录音 → ASR）
   const mrRef = useRef(null)
@@ -233,6 +248,27 @@ export default function ChatPanel({ onSpeakingChange }) {
         return c
       })
 
+    // ── 流式语音：边吐字边按句合成播放 ──
+    // 攒满 2 句才送一段去合成（首段也要凑够 2 句，否则一上来单句开口会断断续续）。
+    // 合成与播放分离：每段一拿到就立刻发起合成，播放按入队顺序串行（边播当前段边合成下一段）。
+    let pendingTts = '' // 已吐字、但还没送去合成的文本
+    let speaking = false // 数字人是否已进入说话态
+    let playChain = Promise.resolve() // 串行播放链，await 它即等全部语音播完
+    const enqueueChunk = (chunk) => {
+      const t = chunk.trim()
+      if (!t) return
+      const synthP = synthOne(t) // 立刻开始合成，与上一段的播放并行
+      playChain = playChain.then(async () => {
+        const b64 = await synthP
+        if (!b64) return
+        if (!speaking) {
+          speaking = true
+          onSpeakingChange?.(true) // 第一段开始播 → 数字人开口
+        }
+        await playOne(b64)
+      })
+    }
+
     try {
       const r = await fetch(`${BASE}api/chat`, {
         method: 'POST',
@@ -258,7 +294,14 @@ export default function ChatPanel({ onSpeakingChange }) {
             const j = JSON.parse(data)
             if (j.delta) {
               answer += j.delta
-              updateLast(answer) // 流式只更新文字，先不合成语音
+              pendingTts += j.delta
+              updateLast(answer)
+              // 攒满 2 句就送这一段去合成（含首段）
+              const { sentences, rest } = splitSentences(pendingTts)
+              if (sentences.length >= 2) {
+                enqueueChunk(sentences.join(''))
+                pendingTts = rest
+              }
             } else if (j.error) {
               errored = true
               updateLast(j.error)
@@ -275,20 +318,18 @@ export default function ChatPanel({ onSpeakingChange }) {
     } catch (e) {
       errored = true
       updateLast('抱歉，网络好像有点问题，请稍后再试。')
-    } finally {
-      setLoading(false)
     }
 
-    // 全部文字生成完之后，再一次性合成整段语音并播放；
-    // 数字人只在这段语音播放期间「开口」，播完立即回待命——开口起止与语音严格一致。
-    if (answer.trim() && !errored) {
-      const b64 = await synthOne(answer.trim())
-      if (b64) {
-        onSpeakingChange?.(true)
-        await playOne(b64)
-        onSpeakingChange?.(false)
-      }
+    // 收尾：把不足 2 句的剩余文本也合成播放；等队列全部播完再退出说话态。
+    if (!errored) {
+      const leftover = pendingTts.trim()
+      if (leftover) enqueueChunk(leftover)
     }
+    await playChain
+    if (speaking) onSpeakingChange?.(false)
+    // loading 保持到语音全部播完才解除：AI 说话期间锁住输入/麦克风/按钮，
+    // 避免下一个问题打断当前语音、两段语音抢同一个 <audio> 导致串音和口型错位。
+    setLoading(false)
   }
 
   return (
