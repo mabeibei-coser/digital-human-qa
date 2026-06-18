@@ -102,13 +102,16 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
   // 记录上一个状态：过渡期间它垫底（不透明）托住人物，过渡结束（略长于 220ms 淡入）后撤掉
   useEffect(() => {
     if (prevStateRef.current === state) return
-    setPrevState(prevStateRef.current)
+    const prev = prevStateRef.current
+    setPrevState(prev)
     prevStateRef.current = state
-    const t = setTimeout(() => setPrevState(null), variant === 'sim' ? 620 : 300)
+    const holdMs = variant === 'sim' && prev === 'speaking' && state === 'idle' ? 980 : variant === 'sim' ? 620 : 300
+    const t = setTimeout(() => setPrevState(null), holdMs)
     return () => clearTimeout(t)
   }, [state, variant])
 
   const allFailed = CLIPS.every((c) => failed[c.key])
+  const simSpeakingToIdle = variant === 'sim' && prevState === 'speaking' && state === 'idle'
 
   return (
     <div className={'avatar avatar--' + variant}>
@@ -118,7 +121,9 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
           ref={refs[c.key]}
           className={
             'avatar__clip avatar__clip--' + c.key +
-            (state === c.key ? ' is-shown' : prevState === c.key ? ' is-prev' : '')
+            (state === c.key ? ' is-shown' : prevState === c.key ? ' is-prev' : '') +
+            (simSpeakingToIdle && c.key === 'idle' ? ' is-solid-target' : '') +
+            (simSpeakingToIdle && c.key === 'speaking' ? ' is-leaving' : '')
           }
           src={base + files[c.key] + EXT + '?v=' + V}
           poster={base + 'poster.jpg?v=' + V}

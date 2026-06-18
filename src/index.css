@@ -123,6 +123,16 @@ body {
   opacity: 1;
   z-index: 3;
 }
+.avatar--sim .avatar__clip.is-leaving {
+  opacity: 0;
+  z-index: 4;
+  transition-duration: 900ms;
+  transition-timing-function: ease-out;
+}
+.avatar--sim .avatar__clip.is-solid-target {
+  opacity: 1;
+  transition-duration: 0ms;
+}
 .avatar-platform {
   position: absolute;
   bottom: 5%;
