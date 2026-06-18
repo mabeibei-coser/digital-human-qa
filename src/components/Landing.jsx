@@ -57,6 +57,28 @@ function ShieldIcon() {
   )
 }
 
+function RobotIcon() {
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <defs>
+        <linearGradient id="landing-robot-bg" x1="10" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#18d4bd" />
+          <stop offset="1" stopColor="#07877d" />
+        </linearGradient>
+      </defs>
+      <rect width="64" height="64" rx="16" fill="url(#landing-robot-bg)" />
+      <path d="M32 13v7" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" />
+      <circle cx="32" cy="10" r="3" fill="#fff" />
+      <rect x="16" y="21" width="32" height="26" rx="10" fill="#fff" />
+      <circle cx="26" cy="34" r="3.4" fill="#07877d" />
+      <circle cx="38" cy="34" r="3.4" fill="#07877d" />
+      <path d="M26 42h12" fill="none" stroke="#07877d" strokeWidth="3.2" strokeLinecap="round" />
+      <path d="M13 31h-3M54 31h-3" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" />
+      <path d="M20 53h24" fill="none" stroke="#bff9f0" strokeWidth="4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function Laurel({ side }) {
   const leaves = [
     [18, 77, -34], [23, 62, -25], [30, 48, -17], [39, 36, -9], [49, 26, 0],
@@ -73,12 +95,22 @@ function Laurel({ side }) {
 }
 
 export default function Landing({ onEnter, onSim }) {
-  const bgSrc = `${import.meta.env.BASE_URL}entrepreneurship-assistant-bg.png`
+  const mobileBgSrc = `${import.meta.env.BASE_URL}entrepreneurship-assistant-bg.png`
+  const desktopBgSrc = `${import.meta.env.BASE_URL}desktop-background.png`
 
   return (
     <div className="landing">
       <div className="landing__canvas">
-        <img className="landing__bg" src={bgSrc} width="853" height="1844" alt="" aria-hidden="true" />
+        <img className="landing__bg landing__bg--mobile" src={mobileBgSrc} width="853" height="1844" alt="" aria-hidden="true" />
+        <img className="landing__bg landing__bg--desktop" src={desktopBgSrc} width="1586" height="992" alt="" aria-hidden="true" />
+        <div className="landing__brand" aria-label="数字人问答 · 创业服务中心">
+          <RobotIcon />
+          <span>数字人问答 · 创业服务中心</span>
+        </div>
+        <div className="landing__top-trust" aria-label="专业可靠 · 隐私保护 · 安全可信">
+          <ShieldIcon />
+          <span>专业可靠 · 隐私保护 · 安全可信</span>
+        </div>
         <h1 className="landing__title">创业服务智能助手</h1>
         <p className="landing__subtitle">3D 数字人 · 语音交互 · 创业政策实时问答</p>
         <div className="landing__btns">

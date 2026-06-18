@@ -1,7 +1,7 @@
 {
   "name": "digital-human-qa",
   "private": true,
-  "version": "0.4.18",
+  "version": "0.4.19",
   "type": "module",
   "description": "社保局创业服务中心 · 数字人 AI 问答演示 Demo（讯飞 LLM + 豆包 TTS）",
   "scripts": {
@@ -10,7 +10,8 @@
     "dev:api": "node server.js",
     "build": "vite build",
     "start": "NODE_ENV=production node server.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify:video-loop": "node scripts/video-loop-verify.mjs"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
@@ -22,6 +23,8 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.0",
+    "playwright": "^1.61.0",
+    "pngjs": "^7.0.0",
     "vite": "^5.4.10"
   }
 }

@@ -1,28 +1,78 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import VideoAvatar from './components/VideoAvatar.jsx'
 import ChatPanel from './components/ChatPanel.jsx'
 import Landing from './components/Landing.jsx'
 import { NO_ALPHA, PAGE_TEAL } from './noAlpha.js'
 
+const LOOP_STATES = new Set(['idle', 'intro', 'speaking'])
+
+function readLoopConfig() {
+  const params = new URLSearchParams(window.location.search)
+  if (params.get('avatarLoop') !== '1') return null
+
+  const sequence = (params.get('sequence') || 'idle,intro,speaking')
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => LOOP_STATES.has(item))
+
+  return {
+    variant: params.get('variant') === 'sim' ? 'sim' : 'default',
+    rounds: Math.max(1, Number(params.get('rounds')) || 50),
+    intervalMs: Math.max(220, Number(params.get('interval')) || 420),
+    sequence: sequence.length ? sequence : ['idle', 'intro', 'speaking'],
+  }
+}
+
 export default function App() {
-  // 前序首页 → 数字人页（同一文档内切换，不跳网址）：点按钮是一次真实手势，
-  // 解锁有声播放，切到数字人页后欢迎语能直接出声（见 VideoAvatar autoUnlock）。
-  const [entered, setEntered] = useState(false)
+  const loopConfig = useMemo(readLoopConfig, [])
+  const [entered, setEntered] = useState(Boolean(loopConfig))
+  const [avatarState, setAvatarState] = useState(loopConfig?.sequence[0] || 'intro')
+  const [variant, setVariant] = useState(loopConfig?.variant || 'default')
 
-  // 数字人状态机：进场 intro（带欢迎语音，播一次）→ idle 待命；
-  // 回答时由 ChatPanel 的 TTS 播放驱动 speaking（播放期间嘴动，播完回 idle）。
-  const [avatarState, setAvatarState] = useState('intro')
+  useEffect(() => {
+    if (!loopConfig) return undefined
 
-  // 当前数字人形象（哪套视频）。两个入口除了形象不同，其余页面完全共用。见 src/avatars.js。
-  const [variant, setVariant] = useState('default')
+    let step = 0
+    const totalSteps = loopConfig.rounds * loopConfig.sequence.length
+    const publish = (done = false) => {
+      window.__A900_AVATAR_LOOP__ = {
+        enabled: true,
+        done,
+        step,
+        totalSteps,
+        rounds: loopConfig.rounds,
+        intervalMs: loopConfig.intervalMs,
+        state: loopConfig.sequence[step % loopConfig.sequence.length],
+        variant: loopConfig.variant,
+      }
+    }
+
+    setEntered(true)
+    setVariant(loopConfig.variant)
+    setAvatarState(loopConfig.sequence[0])
+    publish(false)
+
+    const timer = window.setInterval(() => {
+      step += 1
+      if (step >= totalSteps) {
+        publish(true)
+        window.clearInterval(timer)
+        return
+      }
+      const nextState = loopConfig.sequence[step % loopConfig.sequence.length]
+      setAvatarState(nextState)
+      publish(false)
+    }, loopConfig.intervalMs)
+
+    return () => window.clearInterval(timer)
+  }, [loopConfig])
 
   function enter(which) {
     setVariant(which)
-    setAvatarState('intro') // 每次进场重新播一次欢迎
+    setAvatarState('intro')
     setEntered(true)
   }
 
-  // 桌面：背景大图 + 透明数字人；iOS/微信：纯色 + 不透明数字人（同色，无拼接缝）
   const bgUrl = `${import.meta.env.BASE_URL}bg.jpg`
   const mobileBgUrl = `${import.meta.env.BASE_URL}mobile-service-hall-bg.png`
   const pageStyle = NO_ALPHA
@@ -30,8 +80,9 @@ export default function App() {
     : { backgroundImage: `url(${bgUrl})`, '--mobile-bg': `url(${mobileBgUrl})` }
 
   function goHome() {
+    if (loopConfig) return
     setEntered(false)
-    setAvatarState('intro') // 回首页后再进，重新播一次欢迎
+    setAvatarState('intro')
   }
 
   return (
@@ -47,10 +98,19 @@ export default function App() {
 
       <div className={'layout' + (entered ? '' : ' is-hidden')}>
         <section className="avatar-col">
-          {entered && (
+          {entered && !loopConfig && (
             <button type="button" className="back-home" onClick={goHome} aria-label="返回首页">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
-                strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <path d="M15 18l-6-6 6-6" />
               </svg>
               返回
@@ -75,12 +135,18 @@ export default function App() {
               variant={variant}
               state={avatarState}
               autoUnlock={entered}
-              onIntroEnd={() => setAvatarState('idle')}
+              onIntroEnd={() => {
+                if (!loopConfig) setAvatarState('idle')
+              }}
             />
           </div>
         </section>
         <section className="chat-col">
-          <ChatPanel onSpeakingChange={(on) => setAvatarState(on ? 'speaking' : 'idle')} />
+          <ChatPanel
+            onSpeakingChange={(on) => {
+              if (!loopConfig) setAvatarState(on ? 'speaking' : 'idle')
+            }}
+          />
         </section>
       </div>
     </div>

@@ -1013,6 +1013,12 @@ body {
   user-select: none;
 }
 
+.landing__bg--desktop,
+.landing__brand,
+.landing__top-trust {
+  display: none;
+}
+
 .landing__title {
   position: absolute;
   z-index: 1;
@@ -1221,6 +1227,220 @@ body {
 
 .landing__laurel--right {
   transform: scaleX(-1);
+}
+
+@media (min-width: 1024px) {
+  .landing {
+    height: 100dvh;
+    min-height: 100%;
+    display: block;
+    overflow: hidden;
+    background: #f6fbfb;
+  }
+
+  .landing__canvas {
+    container-type: inline-size;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    aspect-ratio: auto;
+    overflow: hidden;
+  }
+
+  .landing__bg--mobile {
+    display: none;
+  }
+
+  .landing__bg--desktop {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+  }
+
+  .landing__brand {
+    position: absolute;
+    z-index: 2;
+    top: 4.03%;
+    left: 3.28%;
+    display: inline-flex;
+    align-items: center;
+    gap: 20px;
+    color: #0b213d;
+    white-space: nowrap;
+  }
+
+  .landing__brand svg {
+    width: clamp(44px, 3.4vw, 54px);
+    height: clamp(44px, 3.4vw, 54px);
+    flex: none;
+    filter: drop-shadow(0 12px 22px rgba(7, 135, 125, 0.2));
+  }
+
+  .landing__brand span {
+    font-size: clamp(20px, 1.76vw, 28px);
+    line-height: 1;
+    font-weight: 750;
+    letter-spacing: 0;
+  }
+
+  .landing__top-trust {
+    position: absolute;
+    z-index: 2;
+    top: 5.75%;
+    right: 4.2%;
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    color: #0a9186;
+    white-space: nowrap;
+  }
+
+  .landing__top-trust svg {
+    width: clamp(22px, 1.76vw, 28px);
+    height: clamp(22px, 1.76vw, 28px);
+    flex: none;
+  }
+
+  .landing__top-trust span {
+    color: #16293f;
+    font-size: clamp(16px, 1.26vw, 20px);
+    line-height: 1;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  .landing__title {
+    top: 28.7%;
+    left: 54.1%;
+    width: 42%;
+    color: #0a213c;
+    font-size: clamp(48px, 4.4vw, 70px);
+    line-height: 1.06;
+    font-weight: 900;
+    text-align: left;
+    white-space: nowrap;
+    text-shadow: 0 2px 0 rgba(255, 255, 255, 0.18);
+  }
+
+  .landing__subtitle {
+    top: 40.55%;
+    left: 54.2%;
+    width: 42%;
+    color: #2f4255;
+    font-size: clamp(21px, 1.9vw, 30px);
+    line-height: 1.12;
+    font-weight: 400;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .landing__btn {
+    left: 52.6%;
+    top: 48.6%;
+    width: 39.85%;
+    height: 12.9%;
+    border: 2px solid rgba(255, 255, 255, 0.38);
+    border-radius: 999px;
+    background: linear-gradient(90deg, #1bd7c2 0%, #0db5a7 48%, #07897f 100%);
+    box-shadow:
+      0 17px 30px -19px rgba(4, 104, 96, 0.9),
+      inset 0 5px 9px rgba(255, 255, 255, 0.28),
+      inset 0 -5px 9px rgba(0, 97, 91, 0.24);
+  }
+
+  .landing__btn::before {
+    inset: 10px 18px auto;
+    height: 22px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.06));
+    opacity: 0.58;
+  }
+
+  .landing__btn:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 22px 34px -19px rgba(4, 104, 96, 0.96),
+      inset 0 5px 9px rgba(255, 255, 255, 0.28),
+      inset 0 -5px 9px rgba(0, 97, 91, 0.24);
+  }
+
+  .landing__btn--alt {
+    left: 52.6%;
+    top: 64.85%;
+    width: 39.85%;
+    height: 12.25%;
+    color: #087f76;
+    border: 2px solid rgba(8, 151, 140, 0.56);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 255, 254, 0.72));
+    box-shadow:
+      0 18px 34px -24px rgba(8, 106, 99, 0.6),
+      inset 0 4px 9px rgba(255, 255, 255, 0.82);
+  }
+
+  .landing__btn--alt:hover {
+    box-shadow:
+      0 21px 36px -24px rgba(8, 106, 99, 0.68),
+      inset 0 4px 9px rgba(255, 255, 255, 0.82);
+  }
+
+  .landing__btn-icon {
+    left: 5.6%;
+    width: 14.2%;
+    max-width: 90px;
+    filter: drop-shadow(0 11px 14px rgba(0, 99, 91, 0.24));
+  }
+
+  .landing__btn-icon--scan {
+    left: 7.5%;
+    width: 10.9%;
+    max-width: 70px;
+  }
+
+  .landing__btn-label {
+    left: 20.8%;
+    right: 15.5%;
+    font-size: clamp(29px, 2.48vw, 40px);
+    line-height: 1;
+    font-weight: 900;
+    text-align: center;
+  }
+
+  .landing__btn--alt .landing__btn-label {
+    left: 20.5%;
+    right: 13.5%;
+    font-size: clamp(26px, 2.2vw, 35px);
+  }
+
+  .landing__btn-arrow {
+    right: 7%;
+    width: 7.3%;
+    max-width: 46px;
+  }
+
+  .landing__trust {
+    top: 81.95%;
+    left: 50.9%;
+    width: 39.85%;
+    gap: 12px;
+  }
+
+  .landing__trust > svg:not(.landing__laurel) {
+    width: clamp(22px, 1.7vw, 27px);
+    height: clamp(22px, 1.7vw, 27px);
+  }
+
+  .landing__trust span {
+    color: #1e2e33;
+    font-size: clamp(16px, 1.32vw, 21px);
+    line-height: 1;
+    font-weight: 500;
+  }
+
+  .landing__laurel {
+    width: clamp(18px, 1.76vw, 28px);
+    height: clamp(28px, 2.7vw, 43px);
+  }
 }
 
 /* 问答页返回首页按钮（hero 左上角） */

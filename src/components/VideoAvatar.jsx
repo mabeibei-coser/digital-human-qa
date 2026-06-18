@@ -2,22 +2,77 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { NO_ALPHA } from '../noAlpha.js'
 import { AVATARS } from '../avatars.js'
 
-// 三态视频数字人：idle/speaking 静音循环常驻（crossfade）；intro 进场播一次。
-// 全部「静音自动播」打底——iOS/微信只允许静音视频自动播，这样各端都一定能显示画面。
-// 欢迎语音：加载后尝试解除静音（桌面/启动器允许时成功）+ 首次触摸解锁（iOS）。
 const inlineAttrs = { 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }
-const V = '21' // v21: default idle/speaking re-graded — bg pure #fff via top-end curve, figure kept at source brightness (no global lift).
-
-// Use the same MP4 clips everywhere; the supplied source clips were HEVC,
-// so these project assets are browser-safe H.264 transcodes on a pure-white (#fff) studio matte.
+const V = '22'
 const EXT = '.fallback.mp4'
+const DRAWABLE_TIMEOUT_MS = 1400
 
-// 三态固定元数据（哪态循环）；每态实际加载的视频文件名来自所选形象（见 ../avatars.js）。
 const CLIPS = [
   { key: 'idle', loop: true },
   { key: 'intro', loop: false },
   { key: 'speaking', loop: true },
 ]
+
+function waitForVideoEvent(video, names, timeoutMs) {
+  return new Promise((resolve) => {
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      names.forEach((name) => video.removeEventListener(name, finish))
+      clearTimeout(timer)
+      resolve()
+    }
+    const timer = setTimeout(finish, timeoutMs)
+    names.forEach((name) => video.addEventListener(name, finish, { once: true }))
+  })
+}
+
+function waitForPaintedVideoFrame(video) {
+  return new Promise((resolve) => {
+    if (!video) {
+      resolve(false)
+      return
+    }
+    if ('requestVideoFrameCallback' in video) {
+      const id = video.requestVideoFrameCallback(() => resolve(true))
+      setTimeout(() => {
+        if ('cancelVideoFrameCallback' in video) video.cancelVideoFrameCallback(id)
+        resolve(true)
+      }, 180)
+      return
+    }
+    requestAnimationFrame(() => resolve(true))
+  })
+}
+
+async function ensureDrawable(video, { reset = false } = {}) {
+  if (!video) return false
+
+  if (reset) {
+    try {
+      video.pause()
+      if (Math.abs(video.currentTime) > 0.03) {
+        video.currentTime = 0
+        await waitForVideoEvent(video, ['seeked', 'loadeddata', 'canplay'], DRAWABLE_TIMEOUT_MS)
+      }
+    } catch {
+      // Mobile browsers can reject early seeks before metadata; the readiness wait below covers it.
+    }
+  }
+
+  const playPromise = video.play()
+  if (playPromise && typeof playPromise.catch === 'function') {
+    await playPromise.catch(() => {})
+  }
+
+  if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight) {
+    await waitForVideoEvent(video, ['loadeddata', 'canplay', 'timeupdate'], DRAWABLE_TIMEOUT_MS)
+  }
+
+  await waitForPaintedVideoFrame(video)
+  return video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0 && video.videoHeight > 0
+}
 
 export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = false, variant = 'default' }) {
   const { dir, files } = AVATARS[variant] || AVATARS.default
@@ -26,25 +81,29 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
   const speakingRef = useRef(null)
   const refs = { idle: idleRef, intro: introRef, speaking: speakingRef }
   const [failed, setFailed] = useState({})
-  const [introMuted, setIntroMuted] = useState(true) // intro 初始静音→各端都能自动播+显示
-  // 切换时把「上一个状态」的视频垫在底层并保持不透明，新视频在它之上淡入，
-  // 避免对称 crossfade 中途两个人物都半透明 → 人物变淡/露底色「白闪」。
+  const [introMuted, setIntroMuted] = useState(true)
+  const [shownState, setShownState] = useState(state)
   const [prevState, setPrevState] = useState(null)
-  const prevStateRef = useRef(state)
+  const shownStateRef = useRef(state)
+  const transitionTokenRef = useRef(0)
+  const prevClearRef = useRef(null)
   const armedRef = useRef(false)
   const base = import.meta.env.BASE_URL + dir
 
-  // 首次交互：解除 intro 静音（若还在播），让欢迎语音出声。只解静音、不重播、不改状态。
   const armUnlock = useCallback(() => {
     if (armedRef.current) return
     armedRef.current = true
     const events = ['pointerdown', 'keydown', 'touchend', 'click']
     const unlock = () => {
-      // 播放所有视频（覆盖 iOS 省电模式对自动播放的拦截）
-      ;[idleRef.current, speakingRef.current].forEach((v) => { if (v) v.play().catch(() => {}) })
+      ;[idleRef.current, speakingRef.current].forEach((v) => {
+        if (v) v.play().catch(() => {})
+      })
       const intro = introRef.current
       if (intro) {
-        if (intro.muted && !intro.ended) { intro.muted = false; setIntroMuted(false) }
+        if (intro.muted && !intro.ended) {
+          intro.muted = false
+          setIntroMuted(false)
+        }
         intro.play().catch(() => {})
       }
       events.forEach((e) => window.removeEventListener(e, unlock))
@@ -52,22 +111,21 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
     events.forEach((e) => window.addEventListener(e, unlock))
   }, [])
 
-  // 挂载：全部静音自动播（确保 iOS 也显示画面）；intro 再尝试有声（桌面/kiosk 成功，iOS 失败回静音 + 等手势）
   useEffect(() => {
     const idle = idleRef.current
     const speak = speakingRef.current
     const intro = introRef.current
+
     ;[idle, speak].forEach((v) => {
       if (v) {
         v.muted = true
         v.play().catch(() => {})
       }
     })
+
     if (intro) {
       intro.muted = true
-      intro.play().catch(() => {}) // 先静音播起来（能放就放）
-      // 桌面历来允许有声自动播；autoUnlock=从前序页一次真实手势进来（含 iOS/微信），
-      // 借这次 user activation 直接有声播欢迎语，不用再点一次。失败仍由 armUnlock 兜底。
+      intro.play().catch(() => {})
       if (!NO_ALPHA || autoUnlock) {
         intro.muted = false
         intro
@@ -80,48 +138,89 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
           })
       }
     }
-    armUnlock() // 始终挂首次触摸兜底：覆盖 iOS 省电模式（禁自动播）+ 给欢迎语音
+
+    armUnlock()
   }, [armUnlock, autoUnlock])
 
-  // 状态切换：非 intro 态暂停 intro（停欢迎语音）；目标态视频从「当前帧」续播 + 淡入。
-  // ⚠️ 不再 reset currentTime=0：idle/speaking 是常驻循环视频，一直在后台播着、画面是好的。
-  // 强行倒带到 0 会触发透明 webm 重新解码首帧、alpha 通道短暂失效，crossfade 时露出「白闪」。
-  // 从当前帧续播则目标层始终有正常画面，淡入即平滑。
   useEffect(() => {
     const intro = introRef.current
-    if (state === 'intro') {
-      if (intro && intro.paused && !intro.ended) intro.play().catch(() => {})
-    } else {
-      if (intro) intro.pause()
-      const active = refs[state]?.current
-      if (active && active.paused) active.play().catch(() => {})
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state])
+    if (!intro) return
 
-  // 记录上一个状态：过渡期间它垫底（不透明）托住人物，过渡结束（略长于 220ms 淡入）后撤掉
+    if (state === 'intro' || shownState === 'intro' || prevState === 'intro') {
+      if (intro.paused && !intro.ended) intro.play().catch(() => {})
+    } else if (!intro.paused) {
+      intro.pause()
+    }
+  }, [state, shownState, prevState])
+
   useEffect(() => {
-    if (prevStateRef.current === state) return
-    const prev = prevStateRef.current
-    setPrevState(prev)
-    prevStateRef.current = state
-    const holdMs = variant === 'sim' && prev === 'speaking' && state === 'idle' ? 980 : variant === 'sim' ? 620 : 300
-    const t = setTimeout(() => setPrevState(null), holdMs)
-    return () => clearTimeout(t)
+    const current = shownStateRef.current
+    if (current === state) return
+
+    let cancelled = false
+    const token = transitionTokenRef.current + 1
+    transitionTokenRef.current = token
+    const targetVideo = refs[state]?.current
+
+    ;(async () => {
+      let ready = false
+      for (let attempt = 0; attempt < 4 && !ready; attempt += 1) {
+        ready = await ensureDrawable(targetVideo, { reset: state === 'intro' && attempt === 0 })
+        if (!ready && targetVideo) {
+          try {
+            targetVideo.load()
+          } catch {
+            // Keep the previous visible layer if the browser refuses to refresh this target.
+          }
+          await new Promise((resolve) => setTimeout(resolve, 120))
+        }
+      }
+      if (cancelled || transitionTokenRef.current !== token) return
+      if (!ready) return
+
+      const prev = shownStateRef.current
+      setPrevState(prev)
+      shownStateRef.current = state
+      setShownState(state)
+
+      if (prevClearRef.current) clearTimeout(prevClearRef.current)
+      const holdMs = variant === 'sim' && prev === 'speaking' && state === 'idle' ? 980 : variant === 'sim' ? 620 : 340
+      prevClearRef.current = setTimeout(() => {
+        setPrevState(null)
+        prevClearRef.current = null
+      }, holdMs)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // refs are stable React refs; this effect intentionally follows the requested state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, variant])
 
+  useEffect(() => {
+    return () => {
+      if (prevClearRef.current) clearTimeout(prevClearRef.current)
+    }
+  }, [])
+
   const allFailed = CLIPS.every((c) => failed[c.key])
-  const simSpeakingToIdle = variant === 'sim' && prevState === 'speaking' && state === 'idle'
+  const simSpeakingToIdle = variant === 'sim' && prevState === 'speaking' && shownState === 'idle'
 
   return (
-    <div className={'avatar avatar--' + variant}>
+    <div
+      className={'avatar avatar--' + variant}
+      data-avatar-target={state}
+      data-avatar-shown={shownState}
+      data-avatar-ready={state === shownState ? 'true' : 'pending'}
+    >
       {CLIPS.map((c) => (
         <video
           key={c.key}
           ref={refs[c.key]}
           className={
             'avatar__clip avatar__clip--' + c.key +
-            (state === c.key ? ' is-shown' : prevState === c.key ? ' is-prev' : '') +
+            (shownState === c.key ? ' is-shown' : prevState === c.key ? ' is-prev' : '') +
             (simSpeakingToIdle && c.key === 'idle' ? ' is-solid-target' : '') +
             (simSpeakingToIdle && c.key === 'speaking' ? ' is-leaving' : '')
           }
@@ -135,15 +234,15 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
           aria-hidden="true"
           onError={() => setFailed((f) => ({ ...f, [c.key]: true }))}
           onEnded={() => {
-            if (c.key === 'intro') onIntroEnd?.()
+            if (c.key === 'intro' && shownStateRef.current === 'intro') onIntroEnd?.()
           }}
           {...inlineAttrs}
         />
       ))}
       {allFailed && (
         <div className="avatar__placeholder">
-          <div className="avatar__ph-figure">🧑‍💼</div>
-          <p>数字人加载中…</p>
+          <div className="avatar__ph-figure">AI</div>
+          <p>数字人加载中...</p>
         </div>
       )}
     </div>
