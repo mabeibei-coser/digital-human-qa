@@ -95,14 +95,25 @@ function Laurel({ side }) {
 }
 
 export default function Landing({ onEnter, onSim }) {
-  const mobileBgSrc = `${import.meta.env.BASE_URL}entrepreneurship-assistant-bg.png`
-  const desktopBgSrc = `${import.meta.env.BASE_URL}desktop-background.png`
+  const mobileBgSrc = `${import.meta.env.BASE_URL}landing-mobile.jpg`
+  const desktopBgSrc = `${import.meta.env.BASE_URL}landing-desktop.jpg`
 
   return (
     <div className="landing">
       <div className="landing__canvas">
-        <img className="landing__bg landing__bg--mobile" src={mobileBgSrc} width="853" height="1844" alt="" aria-hidden="true" />
-        <img className="landing__bg landing__bg--desktop" src={desktopBgSrc} width="1586" height="992" alt="" aria-hidden="true" />
+        <picture className="landing__picture" aria-hidden="true">
+          <source media="(min-width: 901px)" srcSet={desktopBgSrc} />
+          <img
+            className="landing__bg"
+            src={mobileBgSrc}
+            width="853"
+            height="1844"
+            alt=""
+            fetchPriority="high"
+            loading="eager"
+            decoding="async"
+          />
+        </picture>
         <div className="landing__brand" aria-label="数字人问答 · 创业服务中心">
           <RobotIcon />
           <span>数字人问答 · 创业服务中心</span>
