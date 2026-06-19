@@ -13,6 +13,19 @@ const CLIPS = [
   { key: 'speaking', loop: true },
 ]
 
+const CALIBRATION = {
+  default: {
+    idle: { scale: 1, x: 0, y: 0 },
+    intro: { scale: 1, x: 0, y: 0 },
+    speaking: { scale: 1, x: 0, y: 0 },
+  },
+  sim: {
+    idle: { scale: 1, x: 0, y: 0 },
+    intro: { scale: 1.043, x: 0, y: 0 },
+    speaking: { scale: 1.043, x: 0, y: 0 },
+  },
+}
+
 function waitForVideoEvent(video, names, timeoutMs) {
   return new Promise((resolve) => {
     let done = false
@@ -224,6 +237,11 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
             (simSpeakingToIdle && c.key === 'idle' ? ' is-solid-target' : '') +
             (simSpeakingToIdle && c.key === 'speaking' ? ' is-leaving' : '')
           }
+          style={{
+            '--avatar-scale': CALIBRATION[variant]?.[c.key]?.scale ?? 1,
+            '--avatar-x': `${CALIBRATION[variant]?.[c.key]?.x ?? 0}px`,
+            '--avatar-y': `${CALIBRATION[variant]?.[c.key]?.y ?? 0}px`,
+          }}
           src={base + files[c.key] + EXT + '?v=' + V}
           poster={base + 'poster.jpg?v=' + V}
           muted={c.key === 'intro' ? introMuted : true}

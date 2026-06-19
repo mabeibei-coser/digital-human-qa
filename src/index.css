@@ -110,6 +110,8 @@ body {
   pointer-events: none;
   opacity: 0;
   z-index: 1;
+  transform: translate(var(--avatar-x, 0), var(--avatar-y, 0)) scale(var(--avatar-scale, 1));
+  transform-origin: 50% 100%;
   transition: opacity 220ms ease-out;
   will-change: opacity;
 }
@@ -476,6 +478,12 @@ body {
     object-fit: cover;
     object-position: 100% center;
     filter: brightness(1.06) contrast(1.05);
+  }
+  /* 默认数字人视频已重做成「人物中间调=源视频亮度」（见 da678b6），身后又是纯白、
+     正片叠底≈不改色，此时再叠桌面提亮滤镜会让人物比原片整体亮约 8%、产生色差。
+     故默认形象去掉该滤镜，让屏幕显示回到原视频真实颜色。仿真人仍是旧视频，保持原样。 */
+  .avatar--default .avatar__clip {
+    filter: none;
   }
 
   .avatar-platform {
