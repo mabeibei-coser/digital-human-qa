@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { flushSync } from 'react-dom'
 import VideoAvatar from './components/VideoAvatar.jsx'
 import ChatPanel from './components/ChatPanel.jsx'
 import Landing from './components/Landing.jsx'
@@ -68,9 +69,18 @@ export default function App() {
   }, [loopConfig])
 
   function enter(which) {
-    setVariant(which)
-    setAvatarState('intro')
-    setEntered(true)
+    flushSync(() => {
+      setVariant(which)
+      setAvatarState('intro')
+      setEntered(true)
+    })
+
+    const intro = document.querySelector('.avatar__clip--intro')
+    if (intro) {
+      intro.dataset.a900GestureUnlocked = 'true'
+      intro.muted = false
+      intro.play().catch(() => {})
+    }
   }
 
   const bgUrl = `${import.meta.env.BASE_URL}bg.jpg`

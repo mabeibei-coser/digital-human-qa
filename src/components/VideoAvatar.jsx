@@ -3,7 +3,7 @@ import { NO_ALPHA } from '../noAlpha.js'
 import { AVATARS } from '../avatars.js'
 
 const inlineAttrs = { 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }
-const V = '24'
+const V = '27'
 const EXT = '.fallback.mp4'
 const DRAWABLE_TIMEOUT_MS = 1400
 
@@ -137,9 +137,22 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
     })
 
     if (intro) {
-      intro.muted = true
-      intro.play().catch(() => {})
-      if (!NO_ALPHA || autoUnlock) {
+      if (intro.dataset.a900GestureUnlocked === 'true') {
+        intro.muted = false
+        intro
+          .play()
+          .then(() => setIntroMuted(false))
+          .catch(() => {
+            intro.muted = true
+            setIntroMuted(true)
+            intro.play().catch(() => {})
+          })
+      } else {
+        intro.muted = true
+        intro.play().catch(() => {})
+      }
+
+      if (intro.dataset.a900GestureUnlocked !== 'true' && (!NO_ALPHA || autoUnlock)) {
         intro.muted = false
         intro
           .play()
