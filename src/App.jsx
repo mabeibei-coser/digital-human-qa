@@ -95,8 +95,10 @@ export default function App() {
     setAvatarState('intro')
   }
 
+  const pageVariant = entered ? variant : 'home'
+
   return (
-    <div className="page" style={pageStyle}>
+    <div className={'page page--' + pageVariant} style={pageStyle}>
       {!entered && (
         <div className="home-landing">
           <Landing
@@ -138,7 +140,7 @@ export default function App() {
             </span>
           </div>
 
-          <div className="avatar-stage">
+          <div className={'avatar-stage avatar-stage--' + variant}>
             <div className="avatar-platform" />
             <VideoAvatar
               key={variant}

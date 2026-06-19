@@ -10,6 +10,9 @@
   --line: #dde8ef;
   --soft: #f4fbfb;
   --avatar-bg: #fafafa;
+  --avatar-halo-core: #ffffff;
+  --avatar-halo-mid: #fdfdfd;
+  --avatar-halo-edge: rgba(250, 250, 250, 0.72);
   --shadow: 0 22px 58px -42px rgba(10, 42, 70, 0.42), 0 8px 26px -22px rgba(8, 135, 125, 0.35);
 }
 
@@ -34,6 +37,20 @@ body {
   height: 100%;
   overflow: hidden;
   background: var(--avatar-bg) !important;
+}
+
+.page--default {
+  --avatar-bg: #fafafa;
+  --avatar-halo-core: #ffffff;
+  --avatar-halo-mid: #fdfdfd;
+  --avatar-halo-edge: rgba(250, 250, 250, 0.72);
+}
+
+.page--sim {
+  --avatar-bg: #fafafa;
+  --avatar-halo-core: #fafafa;
+  --avatar-halo-mid: #fafafa;
+  --avatar-halo-edge: rgba(250, 250, 250, 0.82);
 }
 
 .home-landing {
@@ -446,7 +463,7 @@ body {
     position: absolute;
     inset: 7% -16% -3% -18%;
     pointer-events: none;
-    background: radial-gradient(ellipse at 50% 52%, #ffffff 0%, #fdfdfd 42%, rgba(250, 250, 250, 0.72) 64%, rgba(250, 250, 250, 0) 82%);
+    background: radial-gradient(ellipse at 50% 52%, var(--avatar-halo-core) 0%, var(--avatar-halo-mid) 42%, var(--avatar-halo-edge) 64%, rgba(250, 250, 250, 0) 82%);
     z-index: 0;
   }
 
@@ -483,6 +500,10 @@ body {
      正片叠底≈不改色，此时再叠桌面提亮滤镜会让人物比原片整体亮约 8%、产生色差。
      故默认形象去掉该滤镜，让屏幕显示回到原视频真实颜色。仿真人仍是旧视频，保持原样。 */
   .avatar--default .avatar__clip {
+    filter: none;
+  }
+
+  .page--sim .avatar--sim .avatar__clip {
     filter: none;
   }
 
@@ -1603,14 +1624,14 @@ body {
   }
 
   .avatar--sim .avatar__clip {
-    transform: translate(10px, 380px) scale(2.08);
+    transform: translate(10px, 398px) scale(2.08);
     transition-duration: 520ms;
     -webkit-mask-image: radial-gradient(ellipse 39% 130% at 65% 55%, #000 0 68%, rgba(0, 0, 0, 0.84) 82%, transparent 100%);
     mask-image: radial-gradient(ellipse 39% 130% at 65% 55%, #000 0 68%, rgba(0, 0, 0, 0.84) 82%, transparent 100%);
   }
 
   .avatar--sim .avatar__clip--idle {
-    transform: translate(10px, 380px) scale(2.08);
+    transform: translate(10px, 398px) scale(2.08);
   }
 
   .avatar-platform {
@@ -2069,6 +2090,10 @@ body {
 
   .avatar-stage {
     height: 272px;
+  }
+
+  .avatar-stage--sim {
+    height: 368px;
   }
 
   .chat__head {
