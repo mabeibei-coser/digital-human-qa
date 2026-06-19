@@ -3,7 +3,7 @@ import { NO_ALPHA } from '../noAlpha.js'
 import { AVATARS } from '../avatars.js'
 
 const inlineAttrs = { 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }
-const V = '22'
+const V = '24'
 const EXT = '.fallback.mp4'
 const DRAWABLE_TIMEOUT_MS = 1400
 
