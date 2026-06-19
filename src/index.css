@@ -1610,7 +1610,7 @@ body {
   }
 
   .avatar--sim .avatar__clip--idle {
-    transform: translate(10px, 410px) scale(2.08);
+    transform: translate(10px, 380px) scale(2.08);
   }
 
   .avatar-platform {

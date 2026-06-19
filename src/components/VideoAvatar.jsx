@@ -3,7 +3,7 @@ import { NO_ALPHA } from '../noAlpha.js'
 import { AVATARS } from '../avatars.js'
 
 const inlineAttrs = { 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }
-const V = '27'
+const V = '28'
 const EXT = '.fallback.mp4'
 const DRAWABLE_TIMEOUT_MS = 1400
 
@@ -21,8 +21,8 @@ const CALIBRATION = {
   },
   sim: {
     idle: { scale: 1, x: 0, y: 0 },
-    intro: { scale: 1.043, x: 0, y: 0 },
-    speaking: { scale: 1.043, x: 0, y: 0 },
+    intro: { scale: 1, x: 0, y: 0 },
+    speaking: { scale: 1, x: 0, y: 0 },
   },
 }
 

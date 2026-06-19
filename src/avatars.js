@@ -16,6 +16,6 @@ export const AVATARS = {
   // 3D 数字仿真人（入口「3D 数字仿真人演示」，白底新形象；说话视频暂用欢迎占位）
   sim: {
     dir: 'avatar-sim/',
-    files: { idle: 'idle', intro: 'intro', speaking: 'intro' },
+    files: { idle: 'idle', intro: 'intro', speaking: 'speaking' },
   },
 }
