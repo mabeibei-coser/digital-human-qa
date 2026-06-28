@@ -2086,7 +2086,10 @@ body {
   }
 
   .avatar-stage {
-    height: 272px;
+    /* 必须与正常手机档(368px)一致：人物的 transform(translateY(380px) scale(2.08)) 是按 368px
+       舞台手调的固定值。这里曾改成 272px 却没同步改 transform → ≤374px 窄屏(大量安卓机)上人物
+       被往下挪出舞台、只剩一小颗头悬空。舞台是绝对定位、不占布局流，恢复 368px 不影响下方排版。 */
+    height: 368px;
   }
 
   .avatar-stage--sim {

@@ -106,12 +106,13 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'de
     armedRef.current = true
     const events = ['pointerdown', 'keydown', 'touchend', 'click']
     const unlock = () => {
-      ;[idleRef.current, introRef.current, speakingRef.current].forEach((v) => {
-        if (v) {
-          v.muted = true
-          v.play().catch(() => {})
-        }
-      })
+      // 只解锁「当前显示」那一路，别一次性把 3 路都拉起来（安卓硬解器扛不住）
+      const map = { idle: idleRef.current, intro: introRef.current, speaking: speakingRef.current }
+      const v = map[shownStateRef.current]
+      if (v) {
+        v.muted = true
+        v.play().catch(() => {})
+      }
       events.forEach((e) => window.removeEventListener(e, unlock))
     }
     events.forEach((e) => window.addEventListener(e, unlock))
@@ -162,7 +163,9 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'de
     ;(async () => {
       let ready = false
       for (let attempt = 0; attempt < 4 && !ready; attempt += 1) {
-        ready = await ensureDrawable(targetVideo, { reset: state === 'intro' && attempt === 0 })
+        // intro 与 idle 切入时都从第 0 帧（中性姿态）起：crossfade 混合的两帧才同位，
+        // 否则 idle 从循环里随机一帧淡入，会和上一段叠出「双重脸」重影 → 衔接处闪一下。
+        ready = await ensureDrawable(targetVideo, { reset: (state === 'intro' || state === 'idle') && attempt === 0 })
         if (!ready && targetVideo) {
           try {
             targetVideo.load()
@@ -194,6 +197,19 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'de
     // refs are stable React refs; this effect intentionally follows the requested state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, variant])
+
+  // 安卓硬解器同时只扛得住有限路视频，3 路一起解会卡死/断音。
+  // 只保留「当前显示 / 过渡上一帧 / 即将切入的目标」在播，其余暂停，多数时刻只 1 路在解。
+  useEffect(() => {
+    const active = new Set([state, shownState, prevState])
+    ;['idle', 'intro', 'speaking'].forEach((key) => {
+      if (active.has(key)) return
+      const v = refs[key]?.current
+      if (v && !v.paused) v.pause()
+    })
+    // refs 是稳定的 React ref
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, shownState, prevState])
 
   useEffect(() => {
     return () => {

@@ -30,7 +30,6 @@ export default function App() {
   const welcomeAudioRef = useRef(null)
   const welcomePlayingRef = useRef(false)
   const welcomeSeqRef = useRef(0)
-  const driftTimerRef = useRef(null)
   const [entered, setEntered] = useState(Boolean(loopConfig))
   const [avatarState, setAvatarState] = useState(loopConfig?.sequence[0] || 'intro')
   const [variant, setVariant] = useState(loopConfig?.variant || 'default')
@@ -78,33 +77,8 @@ export default function App() {
 
   const HOLD_MS = 700 // 全部就绪后、起播前的停顿（用户要求 0.5~1s）
 
-  function stopDriftWatch() {
-    if (driftTimerRef.current) {
-      window.clearInterval(driftTimerRef.current)
-      driftTimerRef.current = null
-    }
-  }
-
-  // 每 0.5s 巡检：嘴型（视频）是用户盯着看的基准，声音漂出 0.18s 就拨回贴住嘴型。
-  // 手机解码偶有顿挫会让两套时钟分家，这一步把它们持续锁住。
-  function startDriftWatch(video, audio) {
-    stopDriftWatch()
-    driftTimerRef.current = window.setInterval(() => {
-      if (!welcomePlayingRef.current || !video || !audio) return
-      if (video.paused || audio.paused || audio.ended) return
-      try {
-        if (Math.abs(audio.currentTime - video.currentTime) > 0.18) {
-          audio.currentTime = Math.max(0, video.currentTime)
-        }
-      } catch {
-        /* ignore */
-      }
-    }, 500)
-  }
-
   function stopWelcomeAudio({ reset = true } = {}) {
     welcomeSeqRef.current += 1 // 取消任何在途的起播编排
-    stopDriftWatch()
     const audio = welcomeAudioRef.current
     welcomePlayingRef.current = false
     if (!audio) return
@@ -158,7 +132,6 @@ export default function App() {
       try { audio.currentTime = Math.max(0, intro.currentTime) } catch { /* ignore */ }
       const ap = audio.play()
       if (ap && typeof ap.catch === 'function') ap.catch(() => { welcomePlayingRef.current = false })
-      startDriftWatch(intro, audio)
     }
 
     const vp = intro.play()
@@ -237,8 +210,6 @@ export default function App() {
     setAvatarState(on ? 'speaking' : 'idle')
   }
 
-  useEffect(() => () => stopDriftWatch(), [])
-
   const pageVariant = entered ? variant : 'home'
 
   return (
@@ -250,7 +221,6 @@ export default function App() {
         hidden
         onEnded={() => {
           welcomePlayingRef.current = false
-          stopDriftWatch()
           if (!loopConfig) setAvatarState('idle')
         }}
         onError={() => {
