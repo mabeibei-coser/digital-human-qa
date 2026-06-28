@@ -114,16 +114,16 @@ export default function Landing({ onEnter, onSim }) {
             decoding="async"
           />
         </picture>
-        <div className="landing__brand" aria-label="数字人问答 · 创业服务中心">
+        <div className="landing__brand" aria-label="数字人演示平台">
           <RobotIcon />
-          <span>数字人问答 · 创业服务中心</span>
+          <span>数字人演示平台</span>
         </div>
         <div className="landing__top-trust" aria-label="专业可靠 · 隐私保护 · 安全可信">
           <ShieldIcon />
           <span>专业可靠 · 隐私保护 · 安全可信</span>
         </div>
-        <h1 className="landing__title">创业服务智能助手</h1>
-        <p className="landing__subtitle">3D 数字人 · 语音交互 · 创业政策实时问答</p>
+        <h1 className="landing__title">多场景互动数字人</h1>
+        <p className="landing__subtitle">3D 数字人 · 语音交互 · 数字人形象设计</p>
         <div className="landing__btns">
           <button type="button" className="landing__btn" onClick={onEnter}>
             <span className="landing__btn-icon landing__btn-icon--stage">
