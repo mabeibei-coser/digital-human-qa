@@ -19,9 +19,11 @@ const speaker = process.env.VOLC_TTS_SPEAKER || 'zh_female_vv_uranus_bigtts'
 
 const config = JSON.parse(await readFile(configPath, 'utf8'))
 const text = String(config.text || '').trim()
+const speedRatio = Number(config.speedRatio) || 1.0
 
 if (!text) throw new Error('src/welcome.config.json 里的 text 不能为空')
 if (!appKey || !accessKey) throw new Error('缺少 VOLC_TTS_APP_KEY / VOLC_TTS_ACCESS_KEY')
+if (speedRatio < 0.5 || speedRatio > 2.0) throw new Error('speedRatio 建议设置在 0.5 到 2.0 之间')
 
 async function synthesize(textToRead, maxRetries = 2) {
   let delay = 800
@@ -41,7 +43,7 @@ async function synthesize(textToRead, maxRetries = 2) {
         body: JSON.stringify({
           app: { appid: appKey, cluster: 'volcano_bigtts' },
           user: { uid: randomUUID() },
-          audio: { voice_type: speaker, encoding: 'mp3', speed_ratio: 1.0 },
+          audio: { voice_type: speaker, encoding: 'mp3', speed_ratio: speedRatio },
           request: { reqid: randomUUID(), text: textToRead, operation: 'query' },
         }),
       })
@@ -71,7 +73,7 @@ await writeFile(outPath, Buffer.from(audioBase64, 'base64'))
 
 const nextConfig = {
   ...config,
-  version: new Date().toISOString().replace(/\D/g, '').slice(0, 12),
+  version: new Date().toISOString().replace(/\D/g, '').slice(0, 14),
 }
 await writeFile(configPath, `${JSON.stringify(nextConfig, null, 2)}\n`)
 
