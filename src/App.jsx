@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import VideoAvatar from './components/VideoAvatar.jsx'
 import ChatPanel from './components/ChatPanel.jsx'
 import Landing from './components/Landing.jsx'
 import { NO_ALPHA, PAGE_TEAL } from './noAlpha.js'
+import welcomeConfig from './welcome.config.json'
 
 const LOOP_STATES = new Set(['idle', 'intro', 'speaking'])
 
@@ -26,9 +27,13 @@ function readLoopConfig() {
 
 export default function App() {
   const loopConfig = useMemo(readLoopConfig, [])
+  const welcomeAudioRef = useRef(null)
+  const welcomePlayingRef = useRef(false)
   const [entered, setEntered] = useState(Boolean(loopConfig))
   const [avatarState, setAvatarState] = useState(loopConfig?.sequence[0] || 'intro')
   const [variant, setVariant] = useState(loopConfig?.variant || 'default')
+  const baseUrl = import.meta.env.BASE_URL
+  const welcomeAudioUrl = `${baseUrl}${welcomeConfig.audio}?v=${welcomeConfig.version}`
 
   useEffect(() => {
     if (!loopConfig) return undefined
@@ -68,6 +73,30 @@ export default function App() {
     return () => window.clearInterval(timer)
   }, [loopConfig])
 
+  function stopWelcomeAudio({ reset = true } = {}) {
+    const audio = welcomeAudioRef.current
+    welcomePlayingRef.current = false
+    if (!audio) return
+    try {
+      audio.pause()
+      if (reset) audio.currentTime = 0
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function playWelcomeAudio() {
+    if (loopConfig) return
+    const audio = welcomeAudioRef.current
+    if (!audio) return
+    stopWelcomeAudio()
+    audio.src = welcomeAudioUrl
+    welcomePlayingRef.current = true
+    audio.play().catch(() => {
+      welcomePlayingRef.current = false
+    })
+  }
+
   function enter(which) {
     flushSync(() => {
       setVariant(which)
@@ -77,28 +106,48 @@ export default function App() {
 
     const intro = document.querySelector('.avatar__clip--intro')
     if (intro) {
-      intro.dataset.a900GestureUnlocked = 'true'
-      intro.muted = false
+      intro.muted = true
       intro.play().catch(() => {})
     }
+    playWelcomeAudio()
   }
 
-  const bgUrl = `${import.meta.env.BASE_URL}bg.jpg`
-  const mobileBgUrl = `${import.meta.env.BASE_URL}mobile-service-hall-bg.png`
+  const bgUrl = `${baseUrl}bg.jpg`
+  const mobileBgUrl = `${baseUrl}mobile-service-hall-bg.png`
   const pageStyle = NO_ALPHA
     ? { background: PAGE_TEAL, '--mobile-bg': `url(${mobileBgUrl})` }
     : { backgroundImage: `url(${bgUrl})`, '--mobile-bg': `url(${mobileBgUrl})` }
 
   function goHome() {
     if (loopConfig) return
+    stopWelcomeAudio()
     setEntered(false)
     setAvatarState('intro')
+  }
+
+  function handleChatSpeakingChange(on) {
+    if (loopConfig) return
+    stopWelcomeAudio()
+    setAvatarState(on ? 'speaking' : 'idle')
   }
 
   const pageVariant = entered ? variant : 'home'
 
   return (
     <div className={'page page--' + pageVariant} style={pageStyle}>
+      <audio
+        ref={welcomeAudioRef}
+        src={welcomeAudioUrl}
+        preload="auto"
+        hidden
+        onEnded={() => {
+          welcomePlayingRef.current = false
+          if (!loopConfig) setAvatarState('idle')
+        }}
+        onError={() => {
+          welcomePlayingRef.current = false
+        }}
+      />
       {!entered && (
         <div className="home-landing">
           <Landing
@@ -146,19 +195,14 @@ export default function App() {
               key={variant}
               variant={variant}
               state={avatarState}
-              autoUnlock={entered}
               onIntroEnd={() => {
-                if (!loopConfig) setAvatarState('idle')
+                if (!loopConfig && !welcomePlayingRef.current) setAvatarState('idle')
               }}
             />
           </div>
         </section>
         <section className="chat-col">
-          <ChatPanel
-            onSpeakingChange={(on) => {
-              if (!loopConfig) setAvatarState(on ? 'speaking' : 'idle')
-            }}
-          />
+          <ChatPanel onSpeakingChange={handleChatSpeakingChange} />
         </section>
       </div>
     </div>

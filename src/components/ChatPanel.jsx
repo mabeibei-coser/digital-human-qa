@@ -16,10 +16,9 @@ import {
   UserRound,
 } from 'lucide-react'
 import './chat-home-button.css'
+import welcomeConfig from '../welcome.config.json'
 
-const DESKTOP_WELCOME =
-  '您好！我是创业服务智能助手，创业扶持政策、开办流程、补贴申领、担保贷款等问题都可以问我。'
-const MOBILE_WELCOME = '您好，我可以帮您查政策、看条件、理流程。'
+const WELCOME_TEXT = welcomeConfig.text
 
 const SUGGESTIONS = [
   { key: 'loan', label: '创业担保贷款怎么申请？', short: '创业担保贷款', hint: '最高可贷500万', icon: 'bank' },
@@ -98,7 +97,7 @@ function Icon({ name }) {
 export default function ChatPanel({ onSpeakingChange }) {
   const [messages, setMessages] = useState(() => [{
     role: 'assistant',
-    text: isMobileViewport() ? MOBILE_WELCOME : DESKTOP_WELCOME,
+    text: WELCOME_TEXT,
   }])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -342,7 +341,7 @@ export default function ChatPanel({ onSpeakingChange }) {
       try { a.pause(); a.currentTime = 0 } catch (e) { /* ignore */ }
     }
     setInput('')
-    setMessages([{ role: 'assistant', text: isMobileViewport() ? MOBILE_WELCOME : DESKTOP_WELCOME }])
+    setMessages([{ role: 'assistant', text: WELCOME_TEXT }])
     onSpeakingChange?.(false) // 数字人回到待命态
   }
 

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { NO_ALPHA } from '../noAlpha.js'
 import { AVATARS } from '../avatars.js'
 
 const inlineAttrs = { 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }
@@ -87,14 +86,13 @@ async function ensureDrawable(video, { reset = false } = {}) {
   return video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0 && video.videoHeight > 0
 }
 
-export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = false, variant = 'default' }) {
+export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'default' }) {
   const { dir, files } = AVATARS[variant] || AVATARS.default
   const idleRef = useRef(null)
   const introRef = useRef(null)
   const speakingRef = useRef(null)
   const refs = { idle: idleRef, intro: introRef, speaking: speakingRef }
   const [failed, setFailed] = useState({})
-  const [introMuted, setIntroMuted] = useState(true)
   const [shownState, setShownState] = useState(state)
   const [prevState, setPrevState] = useState(null)
   const shownStateRef = useRef(state)
@@ -108,17 +106,12 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
     armedRef.current = true
     const events = ['pointerdown', 'keydown', 'touchend', 'click']
     const unlock = () => {
-      ;[idleRef.current, speakingRef.current].forEach((v) => {
-        if (v) v.play().catch(() => {})
-      })
-      const intro = introRef.current
-      if (intro) {
-        if (intro.muted && !intro.ended) {
-          intro.muted = false
-          setIntroMuted(false)
+      ;[idleRef.current, introRef.current, speakingRef.current].forEach((v) => {
+        if (v) {
+          v.muted = true
+          v.play().catch(() => {})
         }
-        intro.play().catch(() => {})
-      }
+      })
       events.forEach((e) => window.removeEventListener(e, unlock))
     }
     events.forEach((e) => window.addEventListener(e, unlock))
@@ -129,44 +122,15 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
     const speak = speakingRef.current
     const intro = introRef.current
 
-    ;[idle, speak].forEach((v) => {
+    ;[idle, intro, speak].forEach((v) => {
       if (v) {
         v.muted = true
         v.play().catch(() => {})
       }
     })
 
-    if (intro) {
-      if (intro.dataset.a900GestureUnlocked === 'true') {
-        intro.muted = false
-        intro
-          .play()
-          .then(() => setIntroMuted(false))
-          .catch(() => {
-            intro.muted = true
-            setIntroMuted(true)
-            intro.play().catch(() => {})
-          })
-      } else {
-        intro.muted = true
-        intro.play().catch(() => {})
-      }
-
-      if (intro.dataset.a900GestureUnlocked !== 'true' && (!NO_ALPHA || autoUnlock)) {
-        intro.muted = false
-        intro
-          .play()
-          .then(() => setIntroMuted(false))
-          .catch(() => {
-            intro.muted = true
-            setIntroMuted(true)
-            intro.play().catch(() => {})
-          })
-      }
-    }
-
     armUnlock()
-  }, [armUnlock, autoUnlock])
+  }, [armUnlock])
 
   useEffect(() => {
     const intro = introRef.current
@@ -257,7 +221,7 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, autoUnlock = 
           }}
           src={base + files[c.key] + EXT + '?v=' + V}
           poster={base + 'poster.jpg?v=' + V}
-          muted={c.key === 'intro' ? introMuted : true}
+          muted
           autoPlay
           playsInline
           loop={c.loop}
