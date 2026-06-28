@@ -99,6 +99,8 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'de
   const transitionTokenRef = useRef(0)
   const prevClearRef = useRef(null)
   const armedRef = useRef(false)
+  const watchTimeRef = useRef(null)
+  const watchStallRef = useRef(0)
   const base = import.meta.env.BASE_URL + dir
 
   const armUnlock = useCallback(() => {
@@ -211,6 +213,50 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'de
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, shownState, prevState])
 
+  // 看门狗：安卓/微信 X5 会让待机循环视频停掉（loop 没重启 / 省电暂停 / 解码器被回收），
+  // 表现就是「待机卡死、画面不动」。每 1.2s 检查「当前显示的循环态(idle/speaking)」是否还在前进，
+  // 卡住就续播；连续卡住就 load() 硬重载兜底。只看显示中的循环态，不动 intro(一次性)与冻结期。
+  useEffect(() => {
+    const LOOPERS = new Set(['idle', 'speaking'])
+    const tick = () => {
+      const key = shownStateRef.current
+      if (holdIntro || !LOOPERS.has(key)) {
+        watchTimeRef.current = null
+        watchStallRef.current = 0
+        return
+      }
+      const v = refs[key]?.current
+      if (!v || !v.videoWidth) return
+      const t = v.currentTime
+      const last = watchTimeRef.current
+      watchTimeRef.current = t
+      const stalled = v.paused || v.ended || (last != null && Math.abs(t - last) < 0.05)
+      if (!stalled) {
+        watchStallRef.current = 0
+        return
+      }
+      watchStallRef.current += 1
+      try {
+        if (v.ended || (v.duration && t >= v.duration - 0.3)) v.currentTime = 0
+      } catch {
+        /* ignore */
+      }
+      if (watchStallRef.current >= 2) {
+        try {
+          v.load() // 连续卡住：硬重载，兜底解码器被系统回收
+        } catch {
+          /* ignore */
+        }
+        watchStallRef.current = 0
+      }
+      v.play().catch(() => {})
+    }
+    const id = window.setInterval(tick, 1200)
+    return () => window.clearInterval(id)
+    // refs/shownStateRef 稳定；只需在冻结态切换时重置
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdIntro])
+
   useEffect(() => {
     return () => {
       if (prevClearRef.current) clearTimeout(prevClearRef.current)
@@ -252,7 +298,22 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'de
           aria-hidden="true"
           onError={() => setFailed((f) => ({ ...f, [c.key]: true }))}
           onEnded={() => {
-            if (c.key === 'intro' && shownStateRef.current === 'intro') onIntroEnd?.()
+            if (c.key === 'intro' && shownStateRef.current === 'intro') {
+              onIntroEnd?.()
+              return
+            }
+            // 安卓/微信 X5 的 native loop 偶尔到结尾不自动重启 → 手动兜底，避免待机冻住
+            if (c.loop) {
+              const v = refs[c.key]?.current
+              if (v) {
+                try {
+                  v.currentTime = 0
+                } catch {
+                  /* ignore */
+                }
+                v.play().catch(() => {})
+              }
+            }
           }}
           {...inlineAttrs}
         />
