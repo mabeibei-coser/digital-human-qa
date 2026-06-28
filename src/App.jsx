@@ -85,16 +85,37 @@ export default function App() {
     }
   }
 
-  function playWelcomeAudio() {
+  function playWelcomeAudio(syncVideo) {
     if (loopConfig) return
     const audio = welcomeAudioRef.current
     if (!audio) return
-    stopWelcomeAudio()
-    audio.src = welcomeAudioUrl
+    // 不重设 src：JSX 已设同一地址且 preload 好了，重设会触发重新加载、给音频引入起播延迟。
     welcomePlayingRef.current = true
-    audio.play().catch(() => {
-      welcomePlayingRef.current = false
-    })
+    try {
+      audio.pause()
+      audio.currentTime = 0
+    } catch {
+      /* ignore */
+    }
+    const played = audio.play()
+    if (played && typeof played.catch === 'function') {
+      played.catch(() => {
+        welcomePlayingRef.current = false
+      })
+    }
+
+    // 视频从 display:none 揭开后首帧解码有延迟、音频却已开播 → 声音领先于嘴动。
+    // 用视频「首帧真正渲染」的时刻把音频拨回到与视频同一时间点，消除起播漂移。
+    if (syncVideo && typeof syncVideo.requestVideoFrameCallback === 'function') {
+      syncVideo.requestVideoFrameCallback(() => {
+        try {
+          const drift = audio.currentTime - syncVideo.currentTime
+          if (drift > 0.08) audio.currentTime = Math.max(0, syncVideo.currentTime)
+        } catch {
+          /* ignore */
+        }
+      })
+    }
   }
 
   function enter(which) {
@@ -106,10 +127,15 @@ export default function App() {
 
     const intro = document.querySelector('.avatar__clip--intro')
     if (intro) {
+      try {
+        intro.currentTime = 0
+      } catch {
+        /* ignore */
+      }
       intro.muted = true
       intro.play().catch(() => {})
     }
-    playWelcomeAudio()
+    playWelcomeAudio(intro)
   }
 
   const bgUrl = `${baseUrl}bg.jpg`
