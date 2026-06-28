@@ -104,17 +104,33 @@ const audioBase64 = await synthesize(text)
 const outPath = path.join(root, 'public', config.audio)
 await mkdir(path.dirname(outPath), { recursive: true })
 const speechPath = `${outPath}.speech.tmp.mp3`
+const trimmedSpeechPath = `${outPath}.speech.trim.tmp.mp3`
 const adjustedSpeechPath = `${outPath}.speech.adjusted.tmp.mp3`
 await writeFile(speechPath, Buffer.from(audioBase64, 'base64'))
 
-let speechSourcePath = speechPath
-let measuredSpeechDuration = await probeDuration(speechPath)
+// 去掉 TTS 自带的首尾静音（豆包输出开头常有 ~0.3s 静音）→ 否则欢迎语开口比口型晚两个字。
+// 首段 silenceremove 去前导静音；areverse 翻转后再 remove 去尾部静音，再翻回。
+await execFileAsync('ffmpeg', [
+  '-y',
+  '-i',
+  speechPath,
+  '-af',
+  'silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse',
+  '-codec:a',
+  'libmp3lame',
+  '-q:a',
+  '4',
+  trimmedSpeechPath,
+])
+
+let speechSourcePath = trimmedSpeechPath
+let measuredSpeechDuration = await probeDuration(trimmedSpeechPath)
 if (targetSpeechDurationSeconds && Number.isFinite(measuredSpeechDuration)) {
   const tempo = measuredSpeechDuration / targetSpeechDurationSeconds
   await execFileAsync('ffmpeg', [
     '-y',
     '-i',
-    speechPath,
+    trimmedSpeechPath,
     '-filter:a',
     atempoFilter(tempo),
     '-codec:a',
@@ -152,6 +168,7 @@ if (leadSilenceSeconds > 0) {
   await copyFile(speechSourcePath, outPath)
 }
 await unlink(speechPath).catch(() => {})
+await unlink(trimmedSpeechPath).catch(() => {})
 await unlink(adjustedSpeechPath).catch(() => {})
 
 const nextConfig = {

@@ -129,7 +129,9 @@ export default function App() {
 
     const startAudio = () => {
       if (cancelled()) return
-      try { audio.currentTime = Math.max(0, intro.currentTime) } catch { /* ignore */ }
+      // 永远从头播完整欢迎语，绝不快进对齐视频——快进会跳掉开头「你好」，
+      // 让口型领先声音两个字（rVFC 不回调走兜底时尤其明显）。
+      try { if (Math.abs(audio.currentTime) > 0.04) audio.currentTime = 0 } catch { /* ignore */ }
       const ap = audio.play()
       if (ap && typeof ap.catch === 'function') ap.catch(() => { welcomePlayingRef.current = false })
     }
@@ -142,7 +144,7 @@ export default function App() {
       let started = false
       const fire = () => { if (started || cancelled()) return; started = true; startAudio() }
       intro.requestVideoFrameCallback(fire)
-      setTimeout(fire, 300) // 兜底：个别浏览器 rVFC 不回调
+      setTimeout(fire, 150) // 兜底：个别浏览器 rVFC 不回调；放短些，避免视频先跑太多
     } else {
       startAudio()
     }

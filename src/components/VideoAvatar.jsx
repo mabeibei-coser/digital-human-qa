@@ -164,10 +164,11 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'de
 
     ;(async () => {
       let ready = false
-      for (let attempt = 0; attempt < 4 && !ready; attempt += 1) {
-        // intro 与 idle 切入时都从第 0 帧（中性姿态）起：crossfade 混合的两帧才同位，
-        // 否则 idle 从循环里随机一帧淡入，会和上一段叠出「双重脸」重影 → 衔接处闪一下。
-        ready = await ensureDrawable(targetVideo, { reset: (state === 'intro' || state === 'idle') && attempt === 0 })
+      // 最多 2 次尝试就够；原来 4 次在安卓上 idle 半天不就绪时最坏空等 ~6s（画面冻在欢迎最后一帧）。
+      // intro 切入仍 reset 到第 0 帧；idle 不再 reset——pause+seek 在微信 X5 上会把刚暂停的 idle 卡死，
+      // 简单 play() 复活更稳。衔接重影是小问题，待机卡死是大问题，先保不卡。
+      for (let attempt = 0; attempt < 2 && !ready; attempt += 1) {
+        ready = await ensureDrawable(targetVideo, { reset: state === 'intro' && attempt === 0 })
         if (!ready && targetVideo) {
           try {
             targetVideo.load()
@@ -178,7 +179,10 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'de
         }
       }
       if (cancelled || transitionTokenRef.current !== token) return
-      if (!ready) return
+      // 关键：不因 !ready 放弃切换。否则安卓上 idle 没及时就绪会永久卡在欢迎最后一帧，
+      // 且 shownState 停在 intro、看门狗（只盯当前显示的循环态）也接管不到。
+      // 一律提交到目标态并轻推一把，剩下交给看门狗把 idle 续上。
+      if (targetVideo) targetVideo.play().catch(() => {})
 
       const prev = shownStateRef.current
       setPrevState(prev)
@@ -204,7 +208,9 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'de
   // 只保留「当前显示 / 过渡上一帧 / 即将切入的目标」在播，其余暂停，多数时刻只 1 路在解。
   useEffect(() => {
     const active = new Set([state, shownState, prevState])
-    ;['idle', 'intro', 'speaking'].forEach((key) => {
+    // idle 不在此暂停：让它常驻播放，切到待机时它是「活的」直接淡入，不必从暂停态复活——
+    // 微信 X5 上复活刚暂停的 idle 极易卡死（就是「欢迎讲完切待机就冻住」的根）。只暂停 intro/speaking。
+    ;['intro', 'speaking'].forEach((key) => {
       if (active.has(key)) return
       const v = refs[key]?.current
       if (v && !v.paused) v.pause()
@@ -226,32 +232,34 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'de
         return
       }
       const v = refs[key]?.current
-      if (!v || !v.videoWidth) return
+      if (!v) return
       const t = v.currentTime
       const last = watchTimeRef.current
       watchTimeRef.current = t
-      const stalled = v.paused || v.ended || (last != null && Math.abs(t - last) < 0.05)
-      if (!stalled) {
+      if (last == null) return // 首拍只记录，下拍才判断有没有卡住
+      const healthy = !v.paused && !v.ended && v.videoWidth > 0 && Math.abs(t - last) > 0.05
+      if (healthy) {
         watchStallRef.current = 0
         return
       }
+      // 卡住（暂停 / 未前进 / 丢了画面尺寸）→ 恢复
       watchStallRef.current += 1
       try {
         if (v.ended || (v.duration && t >= v.duration - 0.3)) v.currentTime = 0
       } catch {
         /* ignore */
       }
-      if (watchStallRef.current >= 2) {
+      // X5 上 play() 救不活冻死的视频，load() 重建解码器才行：首次卡就 load，之后每 3 拍再 load（冷却避免反复闪）。
+      if (watchStallRef.current === 1 || watchStallRef.current % 3 === 0) {
         try {
-          v.load() // 连续卡住：硬重载，兜底解码器被系统回收
+          v.load()
         } catch {
           /* ignore */
         }
-        watchStallRef.current = 0
       }
       v.play().catch(() => {})
     }
-    const id = window.setInterval(tick, 1200)
+    const id = window.setInterval(tick, 500)
     return () => window.clearInterval(id)
     // refs/shownStateRef 稳定；只需在冻结态切换时重置
     // eslint-disable-next-line react-hooks/exhaustive-deps
