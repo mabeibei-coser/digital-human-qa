@@ -1,7 +1,9 @@
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import dotenv from 'dotenv'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -9,6 +11,7 @@ const root = path.resolve(__dirname, '..')
 const configPath = path.join(root, 'src', 'welcome.config.json')
 const TTS_URL = 'https://openspeech.bytedance.com/api/v1/tts'
 const TTS_RESOURCE = 'volc.service_type.10029'
+const execFileAsync = promisify(execFile)
 
 dotenv.config({ path: path.join(root, '.env.local') })
 dotenv.config({ path: path.join(root, '.env') })
@@ -20,6 +23,8 @@ const speaker = process.env.VOLC_TTS_SPEAKER || 'zh_female_vv_uranus_bigtts'
 const config = JSON.parse(await readFile(configPath, 'utf8'))
 const text = String(config.text || '').trim()
 const speedRatio = Number(config.speedRatio) || 1.0
+const targetSpeechDurationSeconds = Number(config.targetSpeechDurationSeconds) || null
+const leadSilenceSeconds = Math.max(0, Number(config.leadSilenceSeconds) || 0)
 
 if (!text) throw new Error('src/welcome.config.json 里的 text 不能为空')
 if (!appKey || !accessKey) throw new Error('缺少 VOLC_TTS_APP_KEY / VOLC_TTS_ACCESS_KEY')
@@ -66,10 +71,88 @@ async function synthesize(textToRead, maxRetries = 2) {
   throw new Error('TTS 生成失败')
 }
 
+async function probeDuration(filePath) {
+  const { stdout } = await execFileAsync('ffprobe', [
+    '-v',
+    'error',
+    '-show_entries',
+    'format=duration',
+    '-of',
+    'default=noprint_wrappers=1:nokey=1',
+    filePath,
+  ])
+  const textValue = stdout.trim()
+  return textValue ? Number(textValue) : NaN
+}
+
+function atempoFilter(factor) {
+  const parts = []
+  let rest = factor
+  while (rest > 2) {
+    parts.push(2)
+    rest /= 2
+  }
+  while (rest < 0.5) {
+    parts.push(0.5)
+    rest /= 0.5
+  }
+  parts.push(rest)
+  return parts.map((item) => `atempo=${item.toFixed(6)}`).join(',')
+}
+
 const audioBase64 = await synthesize(text)
 const outPath = path.join(root, 'public', config.audio)
 await mkdir(path.dirname(outPath), { recursive: true })
-await writeFile(outPath, Buffer.from(audioBase64, 'base64'))
+const speechPath = `${outPath}.speech.tmp.mp3`
+const adjustedSpeechPath = `${outPath}.speech.adjusted.tmp.mp3`
+await writeFile(speechPath, Buffer.from(audioBase64, 'base64'))
+
+let speechSourcePath = speechPath
+let measuredSpeechDuration = await probeDuration(speechPath)
+if (targetSpeechDurationSeconds && Number.isFinite(measuredSpeechDuration)) {
+  const tempo = measuredSpeechDuration / targetSpeechDurationSeconds
+  await execFileAsync('ffmpeg', [
+    '-y',
+    '-i',
+    speechPath,
+    '-filter:a',
+    atempoFilter(tempo),
+    '-codec:a',
+    'libmp3lame',
+    '-q:a',
+    '4',
+    adjustedSpeechPath,
+  ])
+  speechSourcePath = adjustedSpeechPath
+  measuredSpeechDuration = await probeDuration(adjustedSpeechPath)
+}
+
+if (leadSilenceSeconds > 0) {
+  await execFileAsync('ffmpeg', [
+    '-y',
+    '-f',
+    'lavfi',
+    '-t',
+    String(leadSilenceSeconds),
+    '-i',
+    'anullsrc=r=44100:cl=stereo',
+    '-i',
+    speechSourcePath,
+    '-filter_complex',
+    '[0:a][1:a]concat=n=2:v=0:a=1[a]',
+    '-map',
+    '[a]',
+    '-codec:a',
+    'libmp3lame',
+    '-q:a',
+    '4',
+    outPath,
+  ])
+} else {
+  await copyFile(speechSourcePath, outPath)
+}
+await unlink(speechPath).catch(() => {})
+await unlink(adjustedSpeechPath).catch(() => {})
 
 const nextConfig = {
   ...config,
@@ -77,4 +160,19 @@ const nextConfig = {
 }
 await writeFile(configPath, `${JSON.stringify(nextConfig, null, 2)}\n`)
 
-console.log(`已生成 ${path.relative(root, outPath)}，欢迎语版本 ${nextConfig.version}`)
+let durationNote = ''
+if (targetSpeechDurationSeconds || leadSilenceSeconds) {
+  try {
+    const total = await probeDuration(outPath)
+    const speech = measuredSpeechDuration
+    if (Number.isFinite(total)) {
+      const effectiveSpeech = Number.isFinite(speech) ? speech : Math.max(0, total - leadSilenceSeconds)
+      const delta = targetSpeechDurationSeconds ? effectiveSpeech - targetSpeechDurationSeconds : 0
+      durationNote = `，总时长 ${total.toFixed(3)}s，正文 ${effectiveSpeech.toFixed(3)}s，目标正文 ${targetSpeechDurationSeconds?.toFixed(3) ?? '-'}s，偏差 ${delta >= 0 ? '+' : ''}${delta.toFixed(3)}s`
+    }
+  } catch {
+    durationNote = '，未能用 ffprobe 测量时长'
+  }
+}
+
+console.log(`已生成 ${path.relative(root, outPath)}，欢迎语版本 ${nextConfig.version}${durationNote}`)

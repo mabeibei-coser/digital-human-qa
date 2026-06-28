@@ -1,6 +1,10 @@
 {
   "text": "你好，欢迎来到上海市黄浦区就业与创业服务线上大厅，我是你的助理小桃，有什么问题尽管问我吧。",
   "audio": "welcome/welcome.mp3",
-  "speedRatio": 0.88,
-  "version": "20260628042257"
+  "mouthStartSeconds": 0.359,
+  "mouthEndSeconds": 9.633,
+  "targetSpeechDurationSeconds": 9.274,
+  "leadSilenceSeconds": 0.359,
+  "speedRatio": 1,
+  "version": "20260628052737"
 }
