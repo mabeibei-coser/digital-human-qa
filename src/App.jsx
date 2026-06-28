@@ -29,9 +29,12 @@ export default function App() {
   const loopConfig = useMemo(readLoopConfig, [])
   const welcomeAudioRef = useRef(null)
   const welcomePlayingRef = useRef(false)
+  const welcomeSeqRef = useRef(0)
+  const driftTimerRef = useRef(null)
   const [entered, setEntered] = useState(Boolean(loopConfig))
   const [avatarState, setAvatarState] = useState(loopConfig?.sequence[0] || 'intro')
   const [variant, setVariant] = useState(loopConfig?.variant || 'default')
+  const [welcomeHold, setWelcomeHold] = useState(false)
   const baseUrl = import.meta.env.BASE_URL
   const welcomeAudioUrl = `${baseUrl}${welcomeConfig.audio}?v=${welcomeConfig.version}`
 
@@ -73,7 +76,35 @@ export default function App() {
     return () => window.clearInterval(timer)
   }, [loopConfig])
 
+  const HOLD_MS = 700 // 全部就绪后、起播前的停顿（用户要求 0.5~1s）
+
+  function stopDriftWatch() {
+    if (driftTimerRef.current) {
+      window.clearInterval(driftTimerRef.current)
+      driftTimerRef.current = null
+    }
+  }
+
+  // 每 0.5s 巡检：嘴型（视频）是用户盯着看的基准，声音漂出 0.18s 就拨回贴住嘴型。
+  // 手机解码偶有顿挫会让两套时钟分家，这一步把它们持续锁住。
+  function startDriftWatch(video, audio) {
+    stopDriftWatch()
+    driftTimerRef.current = window.setInterval(() => {
+      if (!welcomePlayingRef.current || !video || !audio) return
+      if (video.paused || audio.paused || audio.ended) return
+      try {
+        if (Math.abs(audio.currentTime - video.currentTime) > 0.18) {
+          audio.currentTime = Math.max(0, video.currentTime)
+        }
+      } catch {
+        /* ignore */
+      }
+    }, 500)
+  }
+
   function stopWelcomeAudio({ reset = true } = {}) {
+    welcomeSeqRef.current += 1 // 取消任何在途的起播编排
+    stopDriftWatch()
     const audio = welcomeAudioRef.current
     welcomePlayingRef.current = false
     if (!audio) return
@@ -85,36 +116,62 @@ export default function App() {
     }
   }
 
-  function playWelcomeAudio(syncVideo) {
+  // 等媒体缓冲到「能往前连续播」（readyState>=HAVE_FUTURE_DATA，首帧已解码），最多兜底等 timeoutMs
+  function waitReady(media, timeoutMs) {
+    return new Promise((resolve) => {
+      if (!media || media.readyState >= 3) return resolve()
+      let done = false
+      const finish = () => {
+        if (done) return
+        done = true
+        clearTimeout(timer)
+        ;['canplay', 'canplaythrough'].forEach((e) => media.removeEventListener(e, finish))
+        resolve()
+      }
+      const timer = setTimeout(finish, timeoutMs)
+      ;['canplay', 'canplaythrough'].forEach((e) => media.addEventListener(e, finish, { once: true }))
+    })
+  }
+
+  // 起播编排：① 等视频+音频都缓冲就绪 → ② 停顿 → ③ 视频音频从 0 一起播
+  async function runWelcomeSequence(intro) {
     if (loopConfig) return
     const audio = welcomeAudioRef.current
-    if (!audio) return
-    // 不重设 src：JSX 已设同一地址且 preload 好了，重设会触发重新加载、给音频引入起播延迟。
+    const token = (welcomeSeqRef.current += 1)
+    const cancelled = () => token !== welcomeSeqRef.current
+
+    await Promise.all([waitReady(intro, 2500), waitReady(audio, 2500)])
+    if (cancelled()) return
+
+    await new Promise((resolve) => setTimeout(resolve, HOLD_MS))
+    if (cancelled() || !intro || !audio) return
+
+    // 解除冻结（用普通 setState：本函数同步把视频起播后 React 再提交，keepalive 不会来抢）
+    setWelcomeHold(false)
+    try { intro.currentTime = 0 } catch { /* ignore */ }
+    try { audio.currentTime = 0 } catch { /* ignore */ }
+    intro.muted = true
     welcomePlayingRef.current = true
-    try {
-      audio.pause()
-      audio.currentTime = 0
-    } catch {
-      /* ignore */
-    }
-    const played = audio.play()
-    if (played && typeof played.catch === 'function') {
-      played.catch(() => {
-        welcomePlayingRef.current = false
-      })
+
+    const startAudio = () => {
+      if (cancelled()) return
+      try { audio.currentTime = Math.max(0, intro.currentTime) } catch { /* ignore */ }
+      const ap = audio.play()
+      if (ap && typeof ap.catch === 'function') ap.catch(() => { welcomePlayingRef.current = false })
+      startDriftWatch(intro, audio)
     }
 
-    // 视频从 display:none 揭开后首帧解码有延迟、音频却已开播 → 声音领先于嘴动。
-    // 用视频「首帧真正渲染」的时刻把音频拨回到与视频同一时间点，消除起播漂移。
-    if (syncVideo && typeof syncVideo.requestVideoFrameCallback === 'function') {
-      syncVideo.requestVideoFrameCallback(() => {
-        try {
-          const drift = audio.currentTime - syncVideo.currentTime
-          if (drift > 0.08) audio.currentTime = Math.max(0, syncVideo.currentTime)
-        } catch {
-          /* ignore */
-        }
-      })
+    const vp = intro.play()
+    if (vp && typeof vp.catch === 'function') vp.catch(() => {})
+
+    // 音频卡视频「首帧渲染」那一刻开播，保证两边同点起跑
+    if (typeof intro.requestVideoFrameCallback === 'function') {
+      let started = false
+      const fire = () => { if (started || cancelled()) return; started = true; startAudio() }
+      intro.requestVideoFrameCallback(fire)
+      setTimeout(fire, 300) // 兜底：个别浏览器 rVFC 不回调
+    } else {
+      startAudio()
     }
   }
 
@@ -122,20 +179,41 @@ export default function App() {
     flushSync(() => {
       setVariant(which)
       setAvatarState('intro')
+      setWelcomeHold(true) // 先把数字人冻结在首帧，避免揭开瞬间多个控制器抢着乱播
       setEntered(true)
     })
 
-    const intro = document.querySelector('.avatar__clip--intro')
-    if (intro) {
+    // 在用户手势内「点亮」音频（iOS / 微信要求）：play 一下随即暂停归零，之后在手势外
+    // 再 play 才不被拦（元素已解锁）。welcome.mp3 开头是静音，这一下点亮听不到声。
+    const audio = welcomeAudioRef.current
+    if (audio && !loopConfig) {
       try {
-        intro.currentTime = 0
+        audio.muted = false
+        audio.currentTime = 0
+        const ap = audio.play()
+        if (ap && typeof ap.then === 'function') {
+          ap.then(() => {
+            audio.pause()
+            try { audio.currentTime = 0 } catch { /* ignore */ }
+          }).catch(() => {})
+        }
       } catch {
         /* ignore */
       }
-      intro.muted = true
-      intro.play().catch(() => {})
     }
-    playWelcomeAudio(intro)
+
+    // 让视频解码出首帧后停住（冻结在第 0 帧，等编排统一起播）
+    const intro = document.querySelector('.avatar__clip--intro')
+    if (intro) {
+      intro.muted = true
+      try { intro.currentTime = 0 } catch { /* ignore */ }
+      const vp = intro.play()
+      if (vp && typeof vp.then === 'function') {
+        vp.then(() => intro.pause()).catch(() => {})
+      }
+    }
+
+    runWelcomeSequence(intro)
   }
 
   const bgUrl = `${baseUrl}bg.jpg`
@@ -147,6 +225,7 @@ export default function App() {
   function goHome() {
     if (loopConfig) return
     stopWelcomeAudio()
+    setWelcomeHold(false)
     setEntered(false)
     setAvatarState('intro')
   }
@@ -154,8 +233,11 @@ export default function App() {
   function handleChatSpeakingChange(on) {
     if (loopConfig) return
     stopWelcomeAudio()
+    setWelcomeHold(false)
     setAvatarState(on ? 'speaking' : 'idle')
   }
+
+  useEffect(() => () => stopDriftWatch(), [])
 
   const pageVariant = entered ? variant : 'home'
 
@@ -168,6 +250,7 @@ export default function App() {
         hidden
         onEnded={() => {
           welcomePlayingRef.current = false
+          stopDriftWatch()
           if (!loopConfig) setAvatarState('idle')
         }}
         onError={() => {
@@ -221,6 +304,7 @@ export default function App() {
               key={variant}
               variant={variant}
               state={avatarState}
+              holdIntro={welcomeHold}
               onIntroEnd={() => {
                 if (!loopConfig && !welcomePlayingRef.current) setAvatarState('idle')
               }}

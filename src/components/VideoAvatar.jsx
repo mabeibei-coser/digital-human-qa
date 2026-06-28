@@ -86,7 +86,7 @@ async function ensureDrawable(video, { reset = false } = {}) {
   return video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0 && video.videoHeight > 0
 }
 
-export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'default' }) {
+export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'default', holdIntro = false }) {
   const { dir, files } = AVATARS[variant] || AVATARS.default
   const idleRef = useRef(null)
   const introRef = useRef(null)
@@ -123,25 +123,32 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'de
     const intro = introRef.current
 
     ;[idle, intro, speak].forEach((v) => {
-      if (v) {
-        v.muted = true
-        v.play().catch(() => {})
-      }
+      if (!v) return
+      v.muted = true
+      if (v === intro && holdIntro) return // 冻结期：intro 停在首帧，等编排统一起播
+      v.play().catch(() => {})
     })
 
     armUnlock()
+    // holdIntro 只取挂载那一刻的值即可（进入时与 variant 一同 flushSync 设好）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [armUnlock])
 
   useEffect(() => {
     const intro = introRef.current
     if (!intro) return
 
+    if (holdIntro) {
+      if (!intro.paused) intro.pause() // 冻结期不抢着播，交给 App 的起播编排统一开
+      return
+    }
+
     if (state === 'intro' || shownState === 'intro' || prevState === 'intro') {
       if (intro.paused && !intro.ended) intro.play().catch(() => {})
     } else if (!intro.paused) {
       intro.pause()
     }
-  }, [state, shownState, prevState])
+  }, [state, shownState, prevState, holdIntro])
 
   useEffect(() => {
     const current = shownStateRef.current
@@ -222,7 +229,7 @@ export default function VideoAvatar({ state = 'intro', onIntroEnd, variant = 'de
           src={base + files[c.key] + EXT + '?v=' + V}
           poster={base + 'poster.jpg?v=' + V}
           muted
-          autoPlay
+          autoPlay={c.key === 'intro' ? !holdIntro : true}
           playsInline
           loop={c.loop}
           preload="auto"
