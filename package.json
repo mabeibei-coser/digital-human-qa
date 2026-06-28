@@ -1,7 +1,7 @@
 {
   "name": "digital-human-qa",
   "private": true,
-  "version": "0.4.31",
+  "version": "0.4.32",
   "type": "module",
   "description": "社保局创业服务中心 · 数字人 AI 问答演示 Demo（讯飞 LLM + 豆包 TTS）",
   "scripts": {
