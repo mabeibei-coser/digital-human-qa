@@ -4,6 +4,7 @@ import VideoAvatar from './components/VideoAvatar.jsx'
 import ChatPanel from './components/ChatPanel.jsx'
 import Landing from './components/Landing.jsx'
 import { NO_ALPHA, PAGE_TEAL } from './noAlpha.js'
+import { initWxShare } from './wxShare.js'
 import welcomeConfig from './welcome.config.json'
 
 const LOOP_STATES = new Set(['idle', 'intro', 'speaking'])
@@ -74,6 +75,17 @@ export default function App() {
 
     return () => window.clearInterval(timer)
   }, [loopConfig])
+
+  // 微信内：配置「···→ 发送给朋友/朋友圈」分享卡片（标题+简介+方形封面）。
+  // 非微信环境自动跳过。封面 a900-share-cover.jpg 放在 public/，按子路径自适应取绝对地址。
+  useEffect(() => {
+    initWxShare({
+      title: '创业服务智能助手',
+      desc: '政策咨询、办事指引、补贴申领，AI 数字人随时帮您解答',
+      link: window.location.href.split('#')[0],
+      imgUrl: `${window.location.origin}${import.meta.env.BASE_URL}a900-share-cover.jpg`,
+    })
+  }, [])
 
   const HOLD_MS = 700 // 全部就绪后、起播前的停顿（用户要求 0.5~1s）
 

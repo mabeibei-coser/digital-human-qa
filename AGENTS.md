@@ -59,6 +59,8 @@ npm run dev      # concurrently 同时起 vite(:3008) + node server.js(:4009)
 - [x] **接 ASR 语音提问**（点麦克风录音→火山 ASR→自动当问题发出）：复用 TTS 同密钥，`POST /api/asr`（原始音频直传，webm/mp4 经 ffmpeg 转 wav），本机 TTS→ASR 端到端自测通过（mp3/webm 双路径准确）
 - [x] **第二个数字人形象（3D 数字仿真人）**：落地页「3D 数字仿真人演示」按钮接通（原是 alert 占位），点进去是**同一套页面/问答/语音**，只换人物视频（白底新形象）。形象配置收敛到单一来源 `src/avatars.js`，`VideoAvatar` 加 `variant` 入参；本机 DOM 度量两入口视频源切换正确、画面渲染播放均通过。
   - 新视频在 `public/avatar-sim/`（待机→idle、欢迎→intro，均 HEVC 转码为 H.264 白底）；**说话视频未生成**，暂用欢迎视频占位（`avatars.js` 里 `sim.files.speaking: 'intro'`），生成后改一行 + 放 `speaking.fallback.mp4` 即可。
+- [x] **首页首屏加载优化已部署**：`v0.4.26` 已上线 `/a900/`。首页首屏图从双 PNG/误下桌面图改为 `<picture>` 响应式 JPEG + HTML preload；手机端线上抓包只请求 `landing-mobile.jpg`（约 68KB），不再请求 `desktop-background.png`（约 2.24MB）。
+- [x] **微信网页分享卡片**（照搬 ATA100）：微信内「···→ 发送给朋友/朋友圈」出标题+简介+方形封面卡片。后端 `lib/wechat-jssdk.js`（stable_token→jsapi_ticket→sha1 签名，带内存缓存）+ `GET /api/wechat/js-config`（只给 *.jsai100.com / localhost 签名）；前端 `src/wxShare.js`（`weixin-js-sdk`），`App.jsx` 一次性 `initWxShare`；封面 `public/a900-share-cover.jpg`（400×400）。本机 build + 端点（fake 模式 + 外链拒签）已验证。**生产生效需填** `WECHAT_OFFICIAL_ACCOUNT_APPID/SECRET`（与 ATA100 同域名同服务器，直接复用 ATA100 同一对公众号凭证；公众号 JS安全域名 / IP 白名单已为本域名配过，无需再配）；不填则 fake 模式、卡片不生效但页面不受影响。
 
 ## ASR 接入要点（新增）
 
@@ -68,9 +70,9 @@ npm run dev      # concurrently 同时起 vite(:3008) + node server.js(:4009)
 
 ## Agent Handoff
 
-- 当前主 Agent：Claude（上一手：新增第二个数字人形象「3D 数字仿真人」）
-- 上一手完成：落地页第二个按钮接通成「同页面换形象」；形象配置收敛到单一来源 `src/avatars.js`（改一处两处同步），`VideoAvatar` 加 `variant` 入参；新视频转码进 `public/avatar-sim/`（说话态暂用欢迎占位）。本机 preview DOM 度量两入口视频源切换正确、渲染播放通过。**改动未提交、未部署**；ASR 那一手也仍未部署。
-- 下一手建议：codex 走 tencent-deploy update 流上线（git pull + restart，端口 3011）；**上线前确认服务器装了 ffmpeg**（ASR 用）。git add 含 `public/avatar-sim/*.mp4`（约 1.3MB，体积同现有 avatar，无需 LFS）。
-- 必读上下文：本文件 + `DEPLOY.md` + `src/avatars.js`（形象单一来源）
-- 文件占用：本次新增 `src/avatars.js`、`public/avatar-sim/`，改了 `src/App.jsx`、`src/components/VideoAvatar.jsx`；codex 部署只读不改这些
-- 决策状态：绿灯（功能验证通过，待部署）；待办：真说话视频生成后替换占位
+- 当前主 Agent：Claude（上一手：照搬 ATA100 微信网页分享）
+- 上一手完成：本机新增微信 JS-SDK 分享（`lib/wechat-jssdk.js` + `server.js` 的 `/api/wechat/js-config` + `src/wxShare.js` + `App.jsx` 的 `initWxShare` + `public/a900-share-cover.jpg` + `package.json` 加 `weixin-js-sdk` + `.env.example` 补公众号两项）。`npm run build` 通过、端点 fake 模式 + 外链拒签均验证；**未提交、未部署**。
+- 下一手建议：① 生产 `.env` 填 `WECHAT_OFFICIAL_ACCOUNT_APPID/SECRET`（复用 ATA100 同一对）后走 `tencent-deploy` 上线，再在真机微信里点「···→发送给朋友」验卡片；② 仍待办：真说话视频生成后替换 `avatars.js` 里 `sim.files.speaking` 占位。
+- 必读上下文：本文件 + `DEPLOY.md` + `src/wxShare.js` + `lib/wechat-jssdk.js` + `server.js`
+- 文件占用：当前无正在占用的代码文件。
+- 决策状态：绿灯（本机已验证）；红灯待办：填生产公众号凭证 + 部署属对外上线，需用户确认后再做。

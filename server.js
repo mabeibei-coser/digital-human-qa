@@ -11,6 +11,7 @@ dotenv.config({ path: path.join(__dirname, '.env.local') })
 dotenv.config({ path: path.join(__dirname, '.env') })
 
 const { default: express } = await import('express')
+const { buildJsConfig } = await import('./lib/wechat-jssdk.js')
 
 // 生产用 PORT（部署时 pm2 分配）；开发用 API_PORT（4009，避开 vite 端口注入冲突）
 const PORT =
@@ -345,6 +346,36 @@ async function transcribeAudio(audioBuffer, mimeType) {
     clearTimeout(to)
   }
 }
+
+// ════════════ 微信 JS-SDK 网页分享签名 ════════════
+// 前端 GET /api/wechat/js-config?url=<当前页URL> → 返回 wx.config 四件套。
+// 只给本站(*.jsai100.com / localhost)签名，拒绝给任意外链签名。
+app.get('/api/wechat/js-config', async (req, res) => {
+  const rawUrl = String(req.query.url || '')
+  let host
+  try {
+    const u = new URL(rawUrl)
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('proto')
+    host = u.host
+  } catch {
+    return res.status(400).json({ error: 'url 不合法' })
+  }
+  const ok =
+    host === 'jsai100.com' ||
+    host.endsWith('.jsai100.com') ||
+    host === 'localhost' ||
+    host.startsWith('localhost:') ||
+    host.startsWith('127.0.0.1')
+  if (!ok) {
+    return res.status(400).json({ error: 'url 非本站，拒绝签名' })
+  }
+  try {
+    res.json(await buildJsConfig(rawUrl))
+  } catch (err) {
+    console.error('[js-config] failed:', err.message)
+    res.status(500).json({ error: '签名生成失败' })
+  }
+})
 
 // 生产：托管 dist/
 if (process.env.NODE_ENV === 'production') {
