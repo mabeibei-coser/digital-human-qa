@@ -377,6 +377,25 @@ app.get('/api/wechat/js-config', async (req, res) => {
   }
 })
 
+app.post('/api/wechat/share-debug', (req, res) => {
+  const body = req.body || {}
+  const safe = {
+    ts: new Date().toISOString(),
+    status: String(body.status || '').slice(0, 80),
+    signUrl: String(body.signUrl || '').slice(0, 240),
+    link: String(body.link || '').slice(0, 240),
+    imgUrl: String(body.imgUrl || '').slice(0, 240),
+    href: String(body.href || '').slice(0, 240),
+    message: String(body.message || '').slice(0, 240),
+    result: body.result && typeof body.result === 'object'
+      ? JSON.stringify(body.result).slice(0, 400)
+      : String(body.result || '').slice(0, 240),
+    ua: String(req.headers['user-agent'] || '').slice(0, 240),
+  }
+  console.log('[wx-share-debug]', JSON.stringify(safe))
+  res.json({ ok: true })
+})
+
 // 生产：托管 dist/
 if (process.env.NODE_ENV === 'production') {
   const distDir = path.join(__dirname, 'dist')

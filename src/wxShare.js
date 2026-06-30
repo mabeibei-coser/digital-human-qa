@@ -7,6 +7,7 @@ const JS_API_LIST = [
   'onMenuShareAppMessage',
   'onMenuShareTimeline',
 ]
+const debugAlertKeys = new Set()
 
 export function isWeChatBrowser() {
   return /micromessenger/i.test(navigator.userAgent)
@@ -62,11 +63,38 @@ function rememberWxShareState(state) {
     ...state,
     updatedAt: new Date().toISOString(),
   }
-  if (isWxDebugEnabled()) console.info('[wxShare]', window.__A900_WX_SHARE__)
+  if (isWxDebugEnabled()) {
+    console.info('[wxShare]', window.__A900_WX_SHARE__)
+    reportDebugEvent(window.__A900_WX_SHARE__)
+  }
 }
 
-function debugAlert(title, payload = {}) {
+function reportDebugEvent(state) {
+  try {
+    fetch(`${API_BASE}api/wechat/share-debug`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: state.status,
+        signUrl: state.signUrl,
+        link: state.link,
+        imgUrl: state.imgUrl,
+        message: state.message,
+        result: state.result,
+        href: window.location.href,
+        userAgent: navigator.userAgent,
+      }),
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    // noop
+  }
+}
+
+function debugAlertOnce(key, title, payload = {}) {
   if (!isWxDebugEnabled()) return
+  if (debugAlertKeys.has(key)) return
+  debugAlertKeys.add(key)
   try {
     const body = JSON.stringify(payload, null, 2).slice(0, 800)
     window.setTimeout(() => window.alert(`[wxShare] ${title}\n${body}`), 0)
@@ -79,12 +107,16 @@ function buildCallbacks(apiName) {
   return {
     success(res) {
       rememberWxShareState({ status: `${apiName}:success`, result: res })
-      debugAlert(`${apiName}:success`, res)
+      debugAlertOnce(`${apiName}:success`, `${apiName}:success`, res)
     },
     fail(err) {
       const message = err?.errMsg || String(err)
       rememberWxShareState({ status: `${apiName}:fail`, message })
-      debugAlert(`${apiName}:fail`, { message })
+      debugAlertOnce(`${apiName}:fail`, `${apiName}:fail`, { message })
+    },
+    complete(res) {
+      rememberWxShareState({ status: `${apiName}:complete`, result: res })
+      debugAlertOnce(`${apiName}:complete`, `${apiName}:complete`, res)
     },
   }
 }
@@ -115,7 +147,6 @@ function applyShareData(share) {
     })
   }
   rememberWxShareState({ status: 'share-data-registered', title: share.title, link: share.link, imgUrl: share.imgUrl })
-  debugAlert('share-data-registered', { title: share.title, link: share.link, imgUrl: share.imgUrl })
 }
 
 export async function initWxShare({ title, desc, link, imgUrl }) {
@@ -157,6 +188,7 @@ export async function initWxShare({ title, desc, link, imgUrl }) {
           if (attempt === activeAttempt) applyShareData(share)
         }, 1200)
         rememberWxShareState({ status: 'ready', signUrl })
+        debugAlertOnce('wx.ready', 'wx.ready', { signUrl, share })
       })
 
       wx.error((err) => {
