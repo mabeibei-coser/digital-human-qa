@@ -82,7 +82,7 @@ export default function App() {
     initWxShare({
       title: '创业服务智能助手',
       desc: '政策咨询、办事指引、补贴申领，AI 数字人随时帮您解答',
-      link: window.location.href.split('#')[0],
+      link: `${window.location.origin}${import.meta.env.BASE_URL}`,
       imgUrl: `${window.location.origin}${import.meta.env.BASE_URL}a900-share-cover.jpg`,
     })
   }, [])

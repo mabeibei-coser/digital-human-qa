@@ -1,18 +1,26 @@
-/**
- * 微信 JS-SDK 网页分享 —— 让页面在微信里「···→ 发送给朋友/朋友圈」时出卡片。
- * 仅在微信内置浏览器生效；其它环境直接跳过，不影响页面。
- * 后端签名见 server.js `/api/wechat/js-config` + lib/wechat-jssdk.js。
- */
 import wx from 'weixin-js-sdk'
 
-const API_BASE = import.meta.env.BASE_URL // 子路径部署：'/a900/'，本地 '/'
+const API_BASE = import.meta.env.BASE_URL
+const JS_API_LIST = [
+  'updateAppMessageShareData',
+  'updateTimelineShareData',
+  'onMenuShareAppMessage',
+  'onMenuShareTimeline',
+]
 
-/** 是否微信内置浏览器 */
 export function isWeChatBrowser() {
   return /micromessenger/i.test(navigator.userAgent)
 }
 
-/** 向后端取 wx.config 四件套（按当前页 URL 签名）。 */
+function isIOSWeChat() {
+  return isWeChatBrowser() && /iphone|ipad|ipod/i.test(navigator.userAgent)
+}
+
+function isWxDebugEnabled() {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('wxdebug') === '1' || params.get('shareDebug') === '1'
+}
+
 async function fetchJsConfig(url) {
   const res = await fetch(`${API_BASE}api/wechat/js-config?url=${encodeURIComponent(url)}`, {
     credentials: 'include',
@@ -21,48 +29,110 @@ async function fetchJsConfig(url) {
   return res.json().catch(() => null)
 }
 
-/**
- * 配置微信分享卡片。
- * @param {{title:string, desc:string, link:string, imgUrl:string}} opts
- *   link/imgUrl 必须是完整 https 绝对地址；imgUrl 需公网可访问的方形图。
- */
+function getSignUrlCandidates() {
+  const current = window.location.href.split('#')[0]
+  const urls = [current]
+
+  // iOS WeChat may validate against the first URL loaded into the WebView.
+  // If nginx redirected /a900 -> /a900/, retrying without the trailing slash
+  // avoids an otherwise invisible "invalid signature" failure.
+  if (isIOSWeChat()) {
+    try {
+      const u = new URL(current)
+      if (u.pathname.length > 1 && u.pathname.endsWith('/')) {
+        const noSlash = new URL(current)
+        noSlash.pathname = noSlash.pathname.replace(/\/$/, '')
+        urls.push(noSlash.toString())
+      } else if (u.pathname && !u.pathname.endsWith('/')) {
+        const withSlash = new URL(current)
+        withSlash.pathname = `${withSlash.pathname}/`
+        urls.push(withSlash.toString())
+      }
+    } catch {
+      // Keep the current URL as the only candidate.
+    }
+  }
+
+  return Array.from(new Set(urls))
+}
+
+function rememberWxShareState(state) {
+  window.__A900_WX_SHARE__ = {
+    ...(window.__A900_WX_SHARE__ || {}),
+    ...state,
+    updatedAt: new Date().toISOString(),
+  }
+  if (isWxDebugEnabled()) console.info('[wxShare]', window.__A900_WX_SHARE__)
+}
+
+function applyShareData(share) {
+  wx.updateAppMessageShareData(share)
+  wx.updateTimelineShareData({ title: share.title, link: share.link, imgUrl: share.imgUrl })
+  if (typeof wx.onMenuShareAppMessage === 'function') wx.onMenuShareAppMessage(share)
+  if (typeof wx.onMenuShareTimeline === 'function') {
+    wx.onMenuShareTimeline({ title: share.title, link: share.link, imgUrl: share.imgUrl })
+  }
+}
+
 export async function initWxShare({ title, desc, link, imgUrl }) {
   if (!isWeChatBrowser()) return
-  // 预热分享缩略图：微信是异步拉缩略图的，图没拉完就分享 → 缩略图空白。
-  // 页面一打开就让微信 WebView 先把图缓存好，用户首次分享即可显示。
-  if (imgUrl) { try { const im = new Image(); im.src = imgUrl } catch { /* noop */ } }
-  try {
-    // 签名 URL 必须去掉 # 后缀，且等于地址栏 URL（invalid signature 头号原因）
-    const signUrl = window.location.href.split('#')[0]
-    const cfg = await fetchJsConfig(signUrl)
-    if (!cfg || !cfg.signature) return
-
-    wx.config({
-      debug: false, // 真机排错时临时改 true：微信里会弹 config:ok / 错误详情
-      appId: cfg.appId,
-      timestamp: Number(cfg.timestamp),
-      nonceStr: cfg.nonceStr,
-      signature: cfg.signature,
-      jsApiList: [
-        'updateAppMessageShareData', // 新版·分享给朋友
-        'updateTimelineShareData',   // 新版·分享到朋友圈
-        'onMenuShareAppMessage',     // 旧版·朋友（老客户端兼容）
-        'onMenuShareTimeline',       // 旧版·朋友圈
-      ],
-    })
-
-    const share = { title, desc, link, imgUrl }
-    wx.ready(() => {
-      wx.updateAppMessageShareData(share)
-      wx.updateTimelineShareData({ title, link, imgUrl }) // 朋友圈无 desc
-      // 旧客户端兼容（新版客户端会忽略）
-      if (typeof wx.onMenuShareAppMessage === 'function') wx.onMenuShareAppMessage(share)
-      if (typeof wx.onMenuShareTimeline === 'function') {
-        wx.onMenuShareTimeline({ title, link, imgUrl })
-      }
-    })
-    wx.error((err) => console.error('[wxShare] config 失败:', err?.errMsg || err))
-  } catch (err) {
-    console.error('[wxShare] 初始化失败:', err)
+  if (imgUrl) {
+    try {
+      const im = new Image()
+      im.src = imgUrl
+    } catch {
+      // noop
+    }
   }
+
+  const debug = isWxDebugEnabled()
+  const share = { title, desc, link, imgUrl }
+  const signUrls = getSignUrlCandidates()
+  let activeAttempt = 0
+
+  async function configure(index) {
+    const signUrl = signUrls[index]
+    if (!signUrl) return
+    const attempt = ++activeAttempt
+
+    try {
+      rememberWxShareState({ status: 'fetching-config', signUrl, link, imgUrl })
+      const cfg = await fetchJsConfig(signUrl)
+      if (!cfg || !cfg.signature) {
+        rememberWxShareState({ status: 'missing-signature', signUrl })
+        return
+      }
+
+      wx.ready(() => {
+        if (attempt !== activeAttempt) return
+        applyShareData(share)
+        rememberWxShareState({ status: 'ready', signUrl })
+      })
+
+      wx.error((err) => {
+        if (attempt !== activeAttempt) return
+        const message = err?.errMsg || String(err)
+        rememberWxShareState({ status: 'error', signUrl, message })
+        if (/invalid signature/i.test(message) && signUrls[index + 1]) {
+          configure(index + 1)
+          return
+        }
+        console.error('[wxShare] config failed:', message)
+      })
+
+      wx.config({
+        debug,
+        appId: cfg.appId,
+        timestamp: Number(cfg.timestamp),
+        nonceStr: cfg.nonceStr,
+        signature: cfg.signature,
+        jsApiList: JS_API_LIST,
+      })
+    } catch (err) {
+      rememberWxShareState({ status: 'exception', signUrl, message: err?.message || String(err) })
+      console.error('[wxShare] init failed:', err)
+    }
+  }
+
+  configure(0)
 }
