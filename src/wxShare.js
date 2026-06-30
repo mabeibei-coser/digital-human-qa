@@ -65,13 +65,57 @@ function rememberWxShareState(state) {
   if (isWxDebugEnabled()) console.info('[wxShare]', window.__A900_WX_SHARE__)
 }
 
-function applyShareData(share) {
-  wx.updateAppMessageShareData(share)
-  wx.updateTimelineShareData({ title: share.title, link: share.link, imgUrl: share.imgUrl })
-  if (typeof wx.onMenuShareAppMessage === 'function') wx.onMenuShareAppMessage(share)
-  if (typeof wx.onMenuShareTimeline === 'function') {
-    wx.onMenuShareTimeline({ title: share.title, link: share.link, imgUrl: share.imgUrl })
+function debugAlert(title, payload = {}) {
+  if (!isWxDebugEnabled()) return
+  try {
+    const body = JSON.stringify(payload, null, 2).slice(0, 800)
+    window.setTimeout(() => window.alert(`[wxShare] ${title}\n${body}`), 0)
+  } catch {
+    // noop
   }
+}
+
+function buildCallbacks(apiName) {
+  return {
+    success(res) {
+      rememberWxShareState({ status: `${apiName}:success`, result: res })
+      debugAlert(`${apiName}:success`, res)
+    },
+    fail(err) {
+      const message = err?.errMsg || String(err)
+      rememberWxShareState({ status: `${apiName}:fail`, message })
+      debugAlert(`${apiName}:fail`, { message })
+    },
+  }
+}
+
+function applyShareData(share) {
+  wx.updateAppMessageShareData({
+    ...share,
+    ...buildCallbacks('updateAppMessageShareData'),
+  })
+  wx.updateTimelineShareData({
+    title: share.title,
+    link: share.link,
+    imgUrl: share.imgUrl,
+    ...buildCallbacks('updateTimelineShareData'),
+  })
+  if (typeof wx.onMenuShareAppMessage === 'function') {
+    wx.onMenuShareAppMessage({
+      ...share,
+      ...buildCallbacks('onMenuShareAppMessage'),
+    })
+  }
+  if (typeof wx.onMenuShareTimeline === 'function') {
+    wx.onMenuShareTimeline({
+      title: share.title,
+      link: share.link,
+      imgUrl: share.imgUrl,
+      ...buildCallbacks('onMenuShareTimeline'),
+    })
+  }
+  rememberWxShareState({ status: 'share-data-registered', title: share.title, link: share.link, imgUrl: share.imgUrl })
+  debugAlert('share-data-registered', { title: share.title, link: share.link, imgUrl: share.imgUrl })
 }
 
 export async function initWxShare({ title, desc, link, imgUrl }) {
@@ -106,6 +150,12 @@ export async function initWxShare({ title, desc, link, imgUrl }) {
       wx.ready(() => {
         if (attempt !== activeAttempt) return
         applyShareData(share)
+        window.setTimeout(() => {
+          if (attempt === activeAttempt) applyShareData(share)
+        }, 300)
+        window.setTimeout(() => {
+          if (attempt === activeAttempt) applyShareData(share)
+        }, 1200)
         rememberWxShareState({ status: 'ready', signUrl })
       })
 
