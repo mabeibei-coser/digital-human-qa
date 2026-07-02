@@ -47,7 +47,7 @@ const TTS_SPEAKER = process.env.VOLC_TTS_SPEAKER || 'zh_female_vv_uranus_bigtts'
 const ASR_URL = 'https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash'
 const ASR_RESOURCE = process.env.VOLC_ASR_RESOURCE_ID || 'volc.bigasr.auc_turbo'
 
-const SYSTEM_PROMPT = `你是"创业服务智能助手"，服务于政府就业创业服务中心，面向有创业意向的市民。
+const SYSTEM_PROMPT = `你是"数字人演示平台"，服务于政府就业创业服务中心，面向有创业意向的市民。
 你的任务：用通俗、亲切、口语化的中文，解答创业扶持政策、开办流程、补贴申领、创业担保贷款、社保就业等问题。
 要求：
 - 回答简短，控制在 80-160 字，像窗口工作人员当面讲解一样自然。

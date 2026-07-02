@@ -80,7 +80,7 @@ export default function App() {
   // 非微信环境自动跳过。封面 a900-share-cover.jpg 放在 public/，按子路径自适应取绝对地址。
   useEffect(() => {
     initWxShare({
-      title: '创业服务智能助手',
+      title: '数字人演示平台',
       desc: '政策咨询、办事指引、补贴申领，AI 数字人随时帮您解答',
       link: `${window.location.origin}${import.meta.env.BASE_URL}`,
       imgUrl: `${window.location.origin}${import.meta.env.BASE_URL}a900-share-cover.jpg`,
