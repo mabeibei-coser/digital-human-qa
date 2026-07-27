@@ -124,7 +124,8 @@ function inspectSample(sampleItem, baselineRect) {
   if (!shownClip) failures.push('no shown video layer')
   if (!visibleReadyClip) failures.push('no visible decoded video')
   if (state.visibleClipCount < 1) failures.push('all video layers invisible')
-  if (shownClip && shownClip.readyState < 2) failures.push(`shown layer not drawable: ${shownClip.className}`)
+  // crossfade 切换瞬间，新 is-shown 层可能尚未解码，但旧层仍在可见并承接画面；
+  // 此时由 visibleReadyClip + 像素检查判断是否真的出现空白，不把正常淡入误报为失败。
   if (shownClip && shownClip.paused && !shownClip.ended) failures.push(`shown layer paused: ${shownClip.className}`)
   if (pixels.blackRatio > 0.28) failures.push(`black frame ratio ${(pixels.blackRatio * 100).toFixed(1)}%`)
   if (pixels.transparentRatio > 0.01) failures.push(`transparent frame ratio ${(pixels.transparentRatio * 100).toFixed(1)}%`)

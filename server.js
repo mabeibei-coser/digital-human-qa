@@ -12,6 +12,7 @@ dotenv.config({ path: path.join(__dirname, '.env') })
 
 const { default: express } = await import('express')
 const { buildJsConfig } = await import('./lib/wechat-jssdk.js')
+const { getBananaRouterConfig, streamBananaRouterText } = await import('./lib/bananarouter-gemini.js')
 
 // 生产用 PORT（部署时 pm2 分配）；开发用 API_PORT（4009，避开 vite 端口注入冲突）
 const PORT =
@@ -19,20 +20,9 @@ const PORT =
     ? Number(process.env.PORT) || Number(process.env.API_PORT) || 4009
     : Number(process.env.API_PORT) || 4009
 
-// ── 讯飞星火 LLM ──
-// 默认 xopqwen36v35b（通义千问，走讯飞 MaaS）——流式快、逐字、现场演示开口约 7s；
-// 讯飞星火本牌 xsparkx2flash 也可（改 IFLYTEK_MODEL 即可，但开口慢约一倍 ~14s）。
-// astron-code-latest（代码模型）作兜底——同端点、同 key，只换 model。
-// （注：A400 的 IFLYTEK_FALLBACK_*（maas-api / xop35qwen2b）实测 AppIdNoAuthError，弃用。）
-const LLM_URL =
-  (process.env.IFLYTEK_BASE_URL || 'https://maas-coding-api.cn-huabei-1.xf-yun.com/v2') + '/chat/completions'
-const PRIMARY_URL = LLM_URL
-const PRIMARY_KEY = process.env.IFLYTEK_API_KEY
-const PRIMARY_MODEL = process.env.IFLYTEK_MODEL || 'xopqwen36v35b'
-const FB_URL = LLM_URL
-const FB_KEY = process.env.IFLYTEK_API_KEY
-const FB_MODEL = 'astron-code-latest'
-const FB_ENABLED = !!FB_KEY && FB_MODEL !== PRIMARY_MODEL
+// ── BananaRouter Gemini-native LLM ──
+// 文字问答走原生 streamGenerateContent SSE；不使用已验证失败的 OpenAI 兼容地址。
+const LLM_CONFIG = getBananaRouterConfig()
 
 // ── 火山 / 豆包 TTS（参考 A200 lib/volc-tts.ts）──
 const TTS_URL = 'https://openspeech.bytedance.com/api/v1/tts'
@@ -96,28 +86,24 @@ app.use((req, res, next) => {
 
 app.get('/api/health', (req, res) => {
   const volc = !!(TTS_APP_KEY && TTS_ACCESS_KEY)
-  res.json({ ok: true, llm: !!PRIMARY_KEY, tts: volc, asr: volc })
+  res.json({ ok: true, llm: !!LLM_CONFIG, tts: volc, asr: volc })
 })
 
-// 问答：讯飞星火，**SSE 流式**（边生成边吐字，前端按句边合成边播）。主→兜底。
+// 问答：BananaRouter Gemini-native SSE（边生成边吐字，前端按句边合成边播）。
 app.post('/api/chat', async (req, res) => {
   const { question, history } = req.body || {}
   if (typeof question !== 'string' || !question.trim()) {
     return res.status(400).json({ error: '问题不能为空' })
   }
-  if (!PRIMARY_KEY) {
-    return res.status(500).json({ error: '服务器未配置讯飞 API key' })
+  if (!LLM_CONFIG) {
+    return res.status(500).json({ error: '服务器未配置 BananaRouter API key' })
   }
   const hist = Array.isArray(history)
     ? history
         .filter((m) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant'))
         .slice(-6)
     : []
-  const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
-    ...hist,
-    { role: 'user', content: question.trim() },
-  ]
+  const messages = [...hist, { role: 'user', content: question.trim() }]
 
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
   res.setHeader('Cache-Control', 'no-cache, no-transform')
@@ -125,60 +111,20 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no') // nginx 不要缓冲，否则流式失效
   if (res.flushHeaders) res.flushHeaders()
 
-  let got = await streamLLM({ url: PRIMARY_URL, key: PRIMARY_KEY, model: PRIMARY_MODEL, messages, res })
-  if (!got && FB_ENABLED) {
-    got = await streamLLM({ url: FB_URL, key: FB_KEY, model: FB_MODEL, messages, res })
+  try {
+    await streamBananaRouterText({
+      config: LLM_CONFIG,
+      systemPrompt: SYSTEM_PROMPT,
+      messages,
+      onDelta: (delta) => res.write(`data: ${JSON.stringify({ delta })}\n\n`),
+    })
+  } catch (error) {
+    console.error('[chat] stream failed:', error?.category || 'unknown')
+    res.write(`data: ${JSON.stringify({ error: '智能助手暂时繁忙，请稍后再试' })}\n\n`)
   }
-  if (!got) res.write(`data: ${JSON.stringify({ error: '智能助手暂时繁忙，请稍后再试' })}\n\n`)
   res.write('data: [DONE]\n\n')
   res.end()
 })
-
-// 从一个 LLM endpoint 流式读取，逐 delta 转发给前端。返回是否拿到过内容。
-async function streamLLM({ url, key, model, messages, res }, timeoutMs = 60000) {
-  let got = false
-  try {
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model, messages, temperature: 0.7, max_tokens: 600, stream: true }),
-      signal: AbortSignal.timeout(timeoutMs),
-    })
-    if (!r.ok || !r.body) {
-      const t = r.text ? await r.text().catch(() => '') : ''
-      console.error('[chat] stream HTTP', r.status, String(t).slice(0, 150))
-      return false
-    }
-    const reader = r.body.getReader()
-    const dec = new TextDecoder()
-    let buf = ''
-    while (true) {
-      const { value, done } = await reader.read()
-      if (done) break
-      buf += dec.decode(value, { stream: true })
-      let i
-      while ((i = buf.indexOf('\n')) !== -1) {
-        const line = buf.slice(0, i).trim()
-        buf = buf.slice(i + 1)
-        if (!line.startsWith('data:')) continue
-        const data = line.slice(5).trim()
-        if (data === '[DONE]') return got
-        try {
-          const delta = JSON.parse(data)?.choices?.[0]?.delta?.content
-          if (delta) {
-            got = true
-            res.write(`data: ${JSON.stringify({ delta })}\n\n`)
-          }
-        } catch {
-          /* 非 JSON 行忽略 */
-        }
-      }
-    }
-  } catch (e) {
-    console.error('[chat] stream err:', e?.message || e)
-  }
-  return got
-}
 
 // 语音合成：火山 TTS → base64 MP3（未配密钥则静默降级，前端只显示文字）
 app.post('/api/tts', async (req, res) => {
