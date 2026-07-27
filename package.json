@@ -10,6 +10,7 @@
     "dev:api": "node server.js",
     "build": "vite build",
     "test:llm": "node --test --test-isolation=none tests/bananarouter-gemini.test.mjs tests/server-chat-contract.test.mjs",
+    "test:e2e:local": "node tests/local-flow.e2e.mjs",
     "start": "NODE_ENV=production node server.js",
     "preview": "vite preview",
     "verify:video-loop": "node scripts/video-loop-verify.mjs",
