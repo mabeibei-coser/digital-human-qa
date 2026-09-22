@@ -1,0 +1,17 @@
+{
+  "format": 1,
+  "project_id": "A900",
+  "case_prefix": "A900",
+  "document": "docs/maintenance-experience.md",
+  "source_roots": [
+    "app",
+    "lib",
+    "scripts",
+    "src",
+    "tests",
+    "docs",
+    "e2e"
+  ],
+  "daily_owner": "coding-maintenance-daily",
+  "enrolled_at": "2026-09-22T21:52:39+08:00"
+}

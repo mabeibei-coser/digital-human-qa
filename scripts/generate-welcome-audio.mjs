@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { synthesizeTTS } from '../lib/volc-tts.js'
 import { fileURLToPath } from 'node:url'
 import { copyFile, mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { execFile } from 'node:child_process'
@@ -9,8 +9,6 @@ import dotenv from 'dotenv'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
 const configPath = path.join(root, 'src', 'welcome.config.json')
-const TTS_URL = 'https://openspeech.bytedance.com/api/v1/tts'
-const TTS_RESOURCE = 'volc.service_type.10029'
 const execFileAsync = promisify(execFile)
 
 dotenv.config({ path: path.join(root, '.env.local') })
@@ -18,7 +16,6 @@ dotenv.config({ path: path.join(root, '.env') })
 
 const appKey = process.env.VOLC_TTS_APP_KEY
 const accessKey = process.env.VOLC_TTS_ACCESS_KEY
-const speaker = process.env.VOLC_TTS_SPEAKER || 'zh_female_vv_uranus_bigtts'
 
 const config = JSON.parse(await readFile(configPath, 'utf8'))
 const text = String(config.text || '').trim()
@@ -31,44 +28,12 @@ if (!appKey || !accessKey) throw new Error('缺少 VOLC_TTS_APP_KEY / VOLC_TTS_A
 if (speedRatio < 0.5 || speedRatio > 2.0) throw new Error('speedRatio 建议设置在 0.5 到 2.0 之间')
 
 async function synthesize(textToRead, maxRetries = 2) {
-  let delay = 800
-  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 12000)
-    try {
-      const res = await fetch(TTS_URL, {
-        method: 'POST',
-        signal: ctrl.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-App-Key': appKey,
-          'X-Api-Access-Key': accessKey,
-          'X-Api-Resource-Id': TTS_RESOURCE,
-        },
-        body: JSON.stringify({
-          app: { appid: appKey, cluster: 'volcano_bigtts' },
-          user: { uid: randomUUID() },
-          audio: { voice_type: speaker, encoding: 'mp3', speed_ratio: speedRatio },
-          request: { reqid: randomUUID(), text: textToRead, operation: 'query' },
-        }),
-      })
-      clearTimeout(timer)
-      if (res.status === 429 && attempt < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, delay))
-        delay *= 2
-        continue
-      }
-      const data = await res.json()
-      if (data.data) return data.data
-      throw new Error(`TTS 没有返回音频：${data.code || ''} ${data.message || ''}`.trim())
-    } catch (error) {
-      clearTimeout(timer)
-      if (attempt >= maxRetries) throw error
-      await new Promise((resolve) => setTimeout(resolve, delay))
-      delay *= 2
-    }
-  }
-  throw new Error('TTS 生成失败')
+  // V1 speed_ratio=1 maps to V3 speech_rate=0; preserve configured speed.
+  const audio = await synthesizeTTS(textToRead, maxRetries, {
+    speechRate: Math.round((speedRatio - 1) * 100),
+  })
+  if (!audio) throw new Error('TTS 生成失败')
+  return audio
 }
 
 async function probeDuration(filePath) {

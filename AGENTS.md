@@ -76,3 +76,6 @@ npm run dev      # concurrently 同时起 vite(:3008) + node server.js(:4009)
 - 必读上下文：本文件 + `DEPLOY.md` + `src/wxShare.js` + `lib/wechat-jssdk.js` + `server.js`
 - 文件占用：当前无正在占用的代码文件。
 - 决策状态：绿灯（本机已验证）；红灯待办：填生产公众号凭证 + 部署属对外上线，需用户确认后再做。
+
+## 维护经验入口
+开始前必读 [Coding 共用规则](../AGENTS.md) 与 [本项目维护经验](docs/maintenance-experience.md)；结束前按 [共用检查说明](../.gstack/maintenance/README.md) 实际执行 check / close。初始化不代表历史验收。

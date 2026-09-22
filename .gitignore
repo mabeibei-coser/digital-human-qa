@@ -14,3 +14,5 @@ ig_*.png
 output/
 .playwright-cli/
 .claude/
+
+.planning/_system/

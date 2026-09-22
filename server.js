@@ -1,3 +1,4 @@
+import { synthesizeTTS } from './lib/volc-tts.js'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
@@ -25,11 +26,8 @@ const PORT =
 const LLM_CONFIG = getBananaRouterConfig()
 
 // ── 火山 / 豆包 TTS（参考 A200 lib/volc-tts.ts）──
-const TTS_URL = 'https://openspeech.bytedance.com/api/v1/tts'
-const TTS_RESOURCE = 'volc.service_type.10029'
 const TTS_APP_KEY = process.env.VOLC_TTS_APP_KEY
 const TTS_ACCESS_KEY = process.env.VOLC_TTS_ACCESS_KEY
-const TTS_SPEAKER = process.env.VOLC_TTS_SPEAKER || 'zh_female_vv_uranus_bigtts'
 
 // ── 火山 ASR（语音识别）──
 // 复用 TTS 的同一对密钥（VOLC_TTS_APP_KEY / VOLC_TTS_ACCESS_KEY）；大模型录音识别 flash 端点。
@@ -134,51 +132,6 @@ app.post('/api/tts', async (req, res) => {
   const audio = await synthesizeTTS(text.trim())
   res.json({ audio })
 })
-
-async function synthesizeTTS(text, maxRetries = 2) {
-  let delay = 800
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const ctrl = new AbortController()
-    const to = setTimeout(() => ctrl.abort(), 12000)
-    try {
-      const r = await fetch(TTS_URL, {
-        method: 'POST',
-        signal: ctrl.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-App-Key': TTS_APP_KEY,
-          'X-Api-Access-Key': TTS_ACCESS_KEY,
-          'X-Api-Resource-Id': TTS_RESOURCE,
-        },
-        body: JSON.stringify({
-          app: { appid: TTS_APP_KEY, cluster: 'volcano_bigtts' },
-          user: { uid: randomUUID() },
-          audio: { voice_type: TTS_SPEAKER, encoding: 'mp3', speed_ratio: 1.0 },
-          request: { reqid: randomUUID(), text, operation: 'query' },
-        }),
-      })
-      if (r.status === 429) {
-        clearTimeout(to)
-        await new Promise((s) => setTimeout(s, delay))
-        delay *= 2
-        continue
-      }
-      const d = await r.json()
-      clearTimeout(to)
-      if (d.data) return d.data
-      console.error(`[tts] no audio (attempt ${attempt + 1}):`, d?.code, d?.message)
-    } catch (e) {
-      clearTimeout(to)
-      console.error(`[tts] failed attempt ${attempt + 1}:`, e?.message || e)
-    }
-    // 任意失败（含偶发 3011）→ 等一下再重试
-    if (attempt < maxRetries) {
-      await new Promise((s) => setTimeout(s, delay))
-      delay *= 2
-    }
-  }
-  return ''
-}
 
 // 语音识别：浏览器录音(webm/mp4) → (ffmpeg 转 wav) → 火山 ASR → 返回 { text }
 // 前端用原始二进制直传（Content-Type: audio/webm 等），不走 JSON body 解析。

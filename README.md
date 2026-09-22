@@ -38,3 +38,5 @@ Vite + React 前端 ｜ Node + Express 后端（密钥服务端持有）｜ Gemi
 
 - `EXP100-形象说话实验`：数字人视频形象技术来源。
 - `A100-简历优化` / `A200-模拟面试`：Gemini-native LLM 的接法参考来源；火山 TTS/ASR 保持独立。
+
+维护前必读：[维护经验与问题索引](docs/maintenance-experience.md)。
